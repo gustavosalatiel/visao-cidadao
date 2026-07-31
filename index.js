@@ -87,6 +87,10 @@ function agruparHorariosPorCidade(horarios) {
 
 const idsEnviadosPeloBot = new Set();
 const MAX_IDS_RASTREADOS = 500;
+const ultimoEnvioAutomatico = new Map();
+const JANELA_ECO_MS = 8000;
+let conectadoEm = 0;
+const JANELA_POS_CONEXAO_MS = 15000;
 
 function registrarIdEnviado(id) {
   if (!id) return;
@@ -100,24 +104,47 @@ const historicos = new Map();
 const MAX_HISTORICO = 20;
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const buffersPendentes = new Map();
+const DEBOUNCE_MS = 2500;
+
+function bufferizarMensagem(sock, jid, texto) {
+  let pendente = buffersPendentes.get(jid);
+  if (!pendente) {
+    pendente = { textos: [], timer: null };
+    buffersPendentes.set(jid, pendente);
+  }
+  pendente.textos.push(texto);
+  clearTimeout(pendente.timer);
+  pendente.timer = setTimeout(async () => {
+    const textos = pendente.textos;
+    buffersPendentes.delete(jid);
+    try {
+      await responder(sock, jid, textos.join("\n"));
+    } catch (e) {
+      console.error("Erro ao responder:", e.message);
+    }
+  }, DEBOUNCE_MS);
+}
+
 function promptSistema() {
-  return `Você é ${CFG.NOME_ATENDENTE}, atendente da ${CFG.NOME_EMPRESA}, em ${CFG.CIDADE}.
+  return `Você é o atendimento oficial do ${CFG.NOME_EMPRESA}, em ${CFG.CIDADE}.
 Você atende pelo WhatsApp pessoas que clicaram em um anúncio de EXAME DE VISTA GRATUITO.
 
 SUA PERSONALIDADE:
-- Fala como uma pessoa real do interior do Brasil: simpática, acolhedora, natural.
+- Fala em nome do ${CFG.NOME_EMPRESA} (não como uma pessoa com nome próprio) — simpática, acolhedora, natural, como o interior do Brasil.
 - Mensagens CURTAS (1 a 3 frases), como se digitasse no celular. Nunca escreva textões.
 - Usa emoji com moderação (no máximo 1 por mensagem, às vezes nenhum).
-- Nunca diz que é robô, IA ou assistente virtual. Você é a ${CFG.NOME_ATENDENTE}.
-- Nunca usa listas com asteriscos ou formatação — só texto corrido de conversa.
+- Nunca diz que é robô, IA ou assistente virtual. Você é o ${CFG.NOME_EMPRESA}.
+- Nunca usa listas com asteriscos (tipo bullet point) — só texto corrido de conversa. A ÚNICA exceção é deixar o horário e o local em *negrito* (um asterisco de cada lado, formatação do WhatsApp) na hora de confirmar um agendamento.
 
 SEU OBJETIVO:
 1. Seja direta desde a primeira mensagem: dê boas-vindas e já peça o nome completo e a cidade da pessoa para reservar o exame gratuito. Não pergunte como a pessoa está se sentindo nem faça perguntas exploratórias. Exemplo de abertura: "Oi! Aqui é do projeto Visão Cidadão 😊 para realizar seu agendamento para consultas e exames gratuitos me envie seu nome completo e qual sua cidade, que eu já deixo seu exame gratuito reservado!"
-2. Assim que souber a cidade da pessoa, LEIA a lista HORÁRIOS DISPONÍVEIS PARA AGENDAR abaixo e informe pra ela as datas e horários que existem para a cidade dela (ou pras cidades mais próximas, se a exata não tiver data marcada), pra ela escolher um. Nunca invente data ou horário que não esteja na lista. Se a cidade dela não tiver nenhum horário na lista, diga com sinceridade que ainda não tem data marcada lá e pergunte se ela topa ir até a cidade mais próxima que está disponível.
-3. Tirar qualquer dúvida sobre o atendimento usando SOMENTE as informações abaixo.
-4. Conduzir com jeitinho para AGENDAR o exame gratuito.
-5. Para agendar você precisa de: NOME completo da pessoa e o HORÁRIO (data/cidade) escolhido da lista abaixo.
-6. Este canal é SOMENTE para agendamento e dúvidas sobre o exame. Se a pessoa mandar qualquer assunto fora disso, diga educadamente que por aqui você só consegue ajudar com o agendamento do exame gratuito, e volte a pedir nome e cidade.
+2. Assim que souber a cidade da pessoa, LEIA a lista HORÁRIOS DISPONÍVEIS PARA AGENDAR abaixo. Se a cidade dela tiver horários na lista, informe as datas e horários disponíveis pra ela escolher. Se a cidade dela NÃO tiver nenhum horário na lista, responda nesse estilo: "Nessa cidade não temos atendimento no momento, mas nas seguintes cidades sim: [liste as cidades que estão na lista de horários]. Alguma dessas você conseguiria se deslocar pra fazer o seu atendimento, ou alguma fica próxima de você?" Nunca invente data, horário ou cidade que não esteja na lista.
+3. Se a pessoa disser que um horário sugerido não dá pra ela, pergunte "certo, qual horário fica melhor pra você?" (mostrando as opções daquele mesmo dia/cidade). Quando ela escolher um horário que está na lista, confirme "certo, iremos marcar esse horário pra você" e prossiga com o agendamento.
+4. Tirar qualquer dúvida sobre o atendimento usando SOMENTE as informações abaixo.
+5. Conduzir com jeitinho para AGENDAR o exame gratuito.
+6. Para agendar você precisa de: NOME completo da pessoa e o HORÁRIO (data/cidade) escolhido da lista abaixo.
+7. Este canal é SOMENTE para agendamento e dúvidas sobre o exame. Se a pessoa mandar qualquer assunto fora disso, diga educadamente que por aqui você só consegue ajudar com o agendamento do exame gratuito, e volte a pedir nome e cidade.
 
 INFORMAÇÕES DA EMPRESA (use só isso, não invente):
 ${CFG.INFORMACOES}
@@ -131,7 +158,7 @@ REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 - Quando a pessoa CONFIRMAR um horário e você já souber o nome dela, finalize sua resposta com esta marcação EXATA em uma linha separada:
 ###AGENDAR###{"nome":"NOME DA PESSOA","horario":"HORÁRIO ESCOLHIDO"}
 - Essa marcação é invisível pra pessoa (o sistema remove). Use apenas UMA vez, na hora que fechar o agendamento.
-- Na mesma mensagem, confirme pra pessoa: horário + endereço + que é gratuito.
+- Na mesma mensagem, confirme pra pessoa: a *data* (sempre por extenso, tipo "21 de agosto", nunca "21/08"), o *horário* e o *local* em negrito (asterisco de cada lado) + que é gratuito.
 - Se a pessoa pedir algo que você não sabe, diga que vai verificar com a equipe e que já retornam.
 - Se perguntarem sobre preços de óculos, responda, mas deixe claro que a compra nunca é obrigatória.`;
 }
@@ -143,7 +170,7 @@ async function perguntarIA(historico) {
   }));
 
   const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${CFG.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${CFG.GEMINI_API_KEY}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -215,6 +242,7 @@ async function responder(sock, jid, textoRecebido) {
   await espera(CFG.DELAY_MS);
   const enviada = await sock.sendMessage(jid, { text: resposta });
   registrarIdEnviado(enviada?.key?.id);
+  ultimoEnvioAutomatico.set(jid, Date.now());
 }
 
 async function iniciarBot() {
@@ -251,6 +279,7 @@ async function iniciarBot() {
       qrcode.generate(qr, { small: true });
     }
     if (connection === "open") {
+      conectadoEm = Date.now();
       console.log("✅ Bot conectado ao WhatsApp!");
     }
     if (connection === "close") {
@@ -273,12 +302,19 @@ async function iniciarBot() {
         "";
 
       if (msg.key.fromMe) {
+        const limparId = (j) => (j || "").split("@")[0].split(":")[0];
+        if (limparId(jid) === limparId(sock.user?.id)) continue;
+        if (Date.now() - conectadoEm < JANELA_POS_CONEXAO_MS) continue;
         if (texto.trim().toLowerCase() === "/retomar") {
           if (pausados.delete(jid)) {
             salvarPausados(pausados);
             console.log("▶️  IA retomada para:", jid.replace("@s.whatsapp.net", ""));
           }
-        } else if (!idsEnviadosPeloBot.has(msg.key.id) && !pausados.has(jid)) {
+        } else if (
+          !idsEnviadosPeloBot.has(msg.key.id) &&
+          Date.now() - (ultimoEnvioAutomatico.get(jid) || 0) >= JANELA_ECO_MS &&
+          !pausados.has(jid)
+        ) {
           pausados.add(jid);
           salvarPausados(pausados);
           console.log(
@@ -291,12 +327,9 @@ async function iniciarBot() {
 
       registrarContato(jid);
       if (pausados.has(jid)) continue;
+      if (!texto.trim()) continue;
 
-      try {
-        await responder(sock, jid, texto);
-      } catch (e) {
-        console.error("Erro ao responder:", e.message);
-      }
+      bufferizarMensagem(sock, jid, texto);
     }
   });
 
@@ -326,7 +359,6 @@ function iniciarServidorHTTP(getSock) {
 
     res.json({
       empresa: CFG.NOME_EMPRESA,
-      atendente: CFG.NOME_ATENDENTE,
       horarios: CFG.HORARIOS,
       cidades: agruparHorariosPorCidade(CFG.HORARIOS),
       agendamentos: carregarAgendamentos(),
@@ -381,7 +413,7 @@ function iniciarServidorHTTP(getSock) {
       salvarAgendamento({ nome, telefone, horario, origem: "site" });
       await sock.sendMessage(jid, {
         text:
-          `Oi, ${nome}! Aqui é a ${CFG.NOME_ATENDENTE}, da ${CFG.NOME_EMPRESA} 😊\n\n` +
+          `Oi, ${nome}! Aqui é o ${CFG.NOME_EMPRESA} 😊\n\n` +
           `Vi que você agendou seu exame de vista gratuito pelo nosso site. ` +
           `Tá confirmado:\n\n` +
           `📅 ${horario}\n📍 ${CFG.ENDERECO}\n\n` +
