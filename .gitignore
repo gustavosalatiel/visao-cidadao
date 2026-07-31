@@ -1,0 +1,6 @@
+node_modules/
+.env
+auth/
+agendamentos.json
+pausados.json
+contatos.json
