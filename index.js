@@ -13,6 +13,11 @@ const CFG = require("./config");
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
+if (process.env.LIMPAR_AUTH === "1") {
+  fs.rmSync(path.join(DATA_DIR, "auth"), { recursive: true, force: true });
+  console.log("🧹 Sessão antiga removida (LIMPAR_AUTH=1)");
+}
+
 const ARQ_AGENDAMENTOS = path.join(DATA_DIR, "agendamentos.json");
 
 function carregarAgendamentos() {
