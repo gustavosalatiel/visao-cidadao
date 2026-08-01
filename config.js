@@ -55,4 +55,7 @@ module.exports = {
   PORTA_HTTP: process.env.PORT || process.env.PORTA_HTTP || 3000,
   CHAVE_API: process.env.CHAVE_API || "troque-esta-chave-123",
   DELAY_MS: 2500,
+  FB_ACCESS_TOKEN: process.env.FB_ACCESS_TOKEN || "",
+  FB_AD_ACCOUNT_ID: process.env.FB_AD_ACCOUNT_ID || "",
+  FB_API_VERSION: process.env.FB_API_VERSION || "v21.0",
 };

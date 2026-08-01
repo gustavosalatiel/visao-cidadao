@@ -67,11 +67,12 @@ function salvarContatos(obj) {
 
 const contatos = carregarContatos();
 
-function registrarContato(jid) {
+function registrarContato(jid, numeroReal) {
   const telefone = jid.replace("@s.whatsapp.net", "");
   const agora = new Date().toISOString();
   if (!contatos[telefone]) contatos[telefone] = { primeiraMensagem: agora };
   contatos[telefone].ultimaMensagem = agora;
+  if (numeroReal) contatos[telefone].numeroReal = numeroReal;
   salvarContatos(contatos);
 }
 
@@ -89,6 +90,139 @@ function agruparHorariosPorCidade(horarios) {
   }
   return [...mapa.entries()].map(([cidade, lista]) => ({ cidade, horarios: lista }));
 }
+
+const TIPOS_ACAO_MENSAGEM = [
+  "onsite_conversion.messaging_conversation_started_7d",
+  "onsite_conversion.messaging_first_reply",
+];
+
+function faixaDatas(dias) {
+  const hoje = new Date();
+  const until = hoje.toISOString().slice(0, 10);
+  const desde = new Date(hoje.getTime() - (dias - 1) * 86400000);
+  const since = desde.toISOString().slice(0, 10);
+  return { since, until };
+}
+
+function valorDaAcao(actions, tipos) {
+  if (!Array.isArray(actions)) return 0;
+  return actions
+    .filter((a) => tipos.includes(a.action_type))
+    .reduce((soma, a) => soma + Number(a.value || 0), 0);
+}
+
+async function buscarInsightsMeta(dias) {
+  const { since, until } = faixaDatas(dias);
+  const campos = "campaign_name,impressions,clicks,spend,actions";
+  const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
+  let url =
+    `https://graph.facebook.com/${CFG.FB_API_VERSION}/${CFG.FB_AD_ACCOUNT_ID}/insights` +
+    `?level=campaign&fields=${campos}&time_range=${timeRange}&time_increment=1&limit=500` +
+    `&access_token=${CFG.FB_ACCESS_TOKEN}`;
+
+  const linhas = [];
+  let paginas = 0;
+  while (url && paginas < 15) {
+    const resp = await fetch(url);
+    const json = await resp.json();
+    if (!resp.ok || json.error) {
+      throw new Error(json?.error?.message || `Erro HTTP ${resp.status}`);
+    }
+    linhas.push(...(json.data || []));
+    url = json.paging?.next || null;
+    paginas++;
+  }
+  return linhas;
+}
+
+function listaDias(since, until) {
+  const dias = [];
+  let cursor = new Date(since + "T00:00:00Z");
+  const fim = new Date(until + "T00:00:00Z");
+  while (cursor <= fim) {
+    dias.push(cursor.toISOString().slice(0, 10));
+    cursor = new Date(cursor.getTime() + 86400000);
+  }
+  return dias;
+}
+
+function montarRelatorioCampanhas(linhas, dias) {
+  const { since, until } = faixaDatas(dias);
+  const porDiaMapa = new Map();
+  const porCampanhaMapa = new Map();
+
+  for (const dia of listaDias(since, until)) {
+    porDiaMapa.set(dia, { dia, cliques: 0, impressoes: 0, gasto: 0, mensagens: 0, agendamentos: 0 });
+  }
+
+  for (const l of linhas) {
+    const dia = l.date_start;
+    const cliques = Number(l.clicks || 0);
+    const impressoes = Number(l.impressions || 0);
+    const gasto = Number(l.spend || 0);
+    const mensagens = valorDaAcao(l.actions, TIPOS_ACAO_MENSAGEM);
+
+    if (!porDiaMapa.has(dia)) {
+      porDiaMapa.set(dia, { dia, cliques: 0, impressoes: 0, gasto: 0, mensagens: 0, agendamentos: 0 });
+    }
+    const d = porDiaMapa.get(dia);
+    d.cliques += cliques;
+    d.impressoes += impressoes;
+    d.gasto += gasto;
+    d.mensagens += mensagens;
+
+    const nomeCampanha = l.campaign_name || "Sem nome";
+    if (!porCampanhaMapa.has(nomeCampanha)) {
+      porCampanhaMapa.set(nomeCampanha, { campanha: nomeCampanha, cliques: 0, impressoes: 0, gasto: 0, mensagens: 0 });
+    }
+    const c = porCampanhaMapa.get(nomeCampanha);
+    c.cliques += cliques;
+    c.impressoes += impressoes;
+    c.gasto += gasto;
+    c.mensagens += mensagens;
+  }
+
+  const agendamentosTodos = carregarAgendamentos();
+  for (const a of agendamentosTodos) {
+    const dia = (a.criadoEm || "").slice(0, 10);
+    if (porDiaMapa.has(dia)) porDiaMapa.get(dia).agendamentos += 1;
+  }
+
+  const porDia = [...porDiaMapa.values()].sort((a, b) => (a.dia < b.dia ? -1 : 1));
+  const porCampanha = [...porCampanhaMapa.values()].sort((a, b) => b.gasto - a.gasto);
+
+  const resumo = porDia.reduce(
+    (acc, d) => {
+      acc.cliques += d.cliques;
+      acc.impressoes += d.impressoes;
+      acc.gasto += d.gasto;
+      acc.mensagens += d.mensagens;
+      acc.agendamentos += d.agendamentos;
+      return acc;
+    },
+    { cliques: 0, impressoes: 0, gasto: 0, mensagens: 0, agendamentos: 0 }
+  );
+
+  const conversasNoPeriodo = Object.values(contatos).filter(
+    (c) => c.primeiraMensagem && c.primeiraMensagem.slice(0, 10) >= since && c.primeiraMensagem.slice(0, 10) <= until
+  ).length;
+
+  return {
+    periodo: { since, until, dias },
+    porDia,
+    porCampanha,
+    resumo,
+    funil: {
+      cliques: resumo.cliques,
+      mensagensMeta: resumo.mensagens,
+      conversasBot: conversasNoPeriodo,
+      agendamentos: resumo.agendamentos,
+    },
+  };
+}
+
+const cacheCampanhas = new Map();
+const CACHE_CAMPANHAS_MS = 10 * 60 * 1000;
 
 const idsEnviadosPeloBot = new Set();
 const MAX_IDS_RASTREADOS = 500;
@@ -330,7 +464,12 @@ async function iniciarBot() {
         continue;
       }
 
-      registrarContato(jid);
+      const numeroReal = msg.key.remoteJidAlt
+        ? msg.key.remoteJidAlt.split("@")[0]
+        : jid.endsWith("@s.whatsapp.net")
+        ? jid.split("@")[0]
+        : null;
+      registrarContato(jid, numeroReal);
       if (pausados.has(jid)) continue;
       if (!texto.trim()) continue;
 
@@ -356,7 +495,8 @@ function iniciarServidorHTTP(getSock) {
     const conversas = Object.entries(contatos)
       .map(([telefone, info]) => ({
         telefone,
-        pausado: pausados.has(telefone + "@s.whatsapp.net"),
+        numeroReal: info.numeroReal || null,
+        pausado: pausados.has(telefone) || pausados.has(telefone + "@s.whatsapp.net"),
         primeiraMensagem: info.primeiraMensagem,
         ultimaMensagem: info.ultimaMensagem,
       }))
@@ -372,13 +512,28 @@ function iniciarServidorHTTP(getSock) {
     });
   });
 
+  app.get("/api/conversa", (req, res) => {
+    if (req.query.chave !== CFG.CHAVE_API) {
+      return res.status(401).json({ erro: "Chave inválida" });
+    }
+    const jid = req.query.jid;
+    if (!jid) return res.status(400).json({ erro: "Informe jid" });
+    res.json({ mensagens: historicos.get(jid) || [] });
+  });
+
+  function telefoneParaJid(telefone) {
+    return telefone.endsWith("@lid")
+      ? telefone
+      : telefone.replace(/\D/g, "") + "@s.whatsapp.net";
+  }
+
   app.post("/api/retomar", (req, res) => {
     const { chave, telefone } = req.body || {};
     if (chave !== CFG.CHAVE_API) {
       return res.status(401).json({ erro: "Chave inválida" });
     }
     if (!telefone) return res.status(400).json({ erro: "Envie telefone" });
-    const jid = telefone.replace(/\D/g, "") + "@s.whatsapp.net";
+    const jid = telefoneParaJid(telefone);
     const havia = pausados.delete(jid);
     if (havia) salvarPausados(pausados);
     res.json({ ok: true, retomado: havia });
@@ -390,7 +545,7 @@ function iniciarServidorHTTP(getSock) {
       return res.status(401).json({ erro: "Chave inválida" });
     }
     if (!telefone) return res.status(400).json({ erro: "Envie telefone" });
-    const jid = telefone.replace(/\D/g, "") + "@s.whatsapp.net";
+    const jid = telefoneParaJid(telefone);
     const jaEstava = pausados.has(jid);
     pausados.add(jid);
     if (!jaEstava) salvarPausados(pausados);
@@ -429,6 +584,34 @@ function iniciarServidorHTTP(getSock) {
     } catch (e) {
       console.error("Erro ao enviar confirmação:", e.message);
       res.status(500).json({ erro: "Falha ao enviar mensagem" });
+    }
+  });
+
+  app.get("/api/campanhas", async (req, res) => {
+    if (req.query.chave !== CFG.CHAVE_API) {
+      return res.status(401).json({ erro: "Chave inválida" });
+    }
+    if (!CFG.FB_ACCESS_TOKEN || !CFG.FB_AD_ACCOUNT_ID) {
+      return res.status(400).json({
+        erro:
+          "Integração com Meta Ads não configurada. Defina FB_ACCESS_TOKEN e FB_AD_ACCOUNT_ID no .env.",
+      });
+    }
+
+    const dias = Math.min(Math.max(Number(req.query.dias) || 30, 1), 90);
+    const emCache = cacheCampanhas.get(dias);
+    if (emCache && Date.now() - emCache.buscadoEm < CACHE_CAMPANHAS_MS) {
+      return res.json(emCache.dados);
+    }
+
+    try {
+      const linhas = await buscarInsightsMeta(dias);
+      const relatorio = montarRelatorioCampanhas(linhas, dias);
+      cacheCampanhas.set(dias, { buscadoEm: Date.now(), dados: relatorio });
+      res.json(relatorio);
+    } catch (e) {
+      console.error("Erro ao buscar Meta Ads:", e.message);
+      res.status(502).json({ erro: "Falha ao consultar Meta Ads: " + e.message });
     }
   });
 

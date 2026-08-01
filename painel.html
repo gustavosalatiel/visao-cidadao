@@ -244,6 +244,38 @@
     background: currentColor;
   }
   .conversa-acao { display: flex; align-items: center; gap: 10px; }
+  .conversa-item { border-bottom: 1px solid var(--borda); }
+  .conversa-item:last-child { border-bottom: none; }
+  .conversa-item .conversa-linha { border-bottom: none; }
+  .thread-conversa {
+    display: none;
+    padding: 4px 0 16px;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+  .thread-conversa.aberta { display: block; }
+  .msg-bolha {
+    max-width: 75%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+    margin-bottom: 8px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+  }
+  .msg-bolha.cliente {
+    background: #F1F2F4;
+    color: var(--texto);
+    margin-right: auto;
+    border-bottom-left-radius: 3px;
+  }
+  .msg-bolha.atendente {
+    background: var(--azul-fraco);
+    color: var(--azul);
+    margin-left: auto;
+    border-bottom-right-radius: 3px;
+    text-align: right;
+  }
 
   /* Agenda por município */
   .municipio-grupo {
@@ -307,6 +339,91 @@
   .lista-pessoas .tel { color: var(--texto-fraco); font-size: 13px; }
   .vazio-msg { padding: 12px 0 12px 18px; color: var(--texto-fraco); font-size: 13px; }
 
+  /* Campanhas */
+  .campanhas-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  select#seletorPeriodo {
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--texto);
+  }
+  .campanhas-aviso {
+    margin: 4px 0 16px;
+    padding: 14px 16px;
+    border-radius: 10px;
+    background: var(--ambar-fraco);
+    border: 1px solid #F3D9B5;
+    color: var(--ambar);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .campanhas-aviso code {
+    background: rgba(0,0,0,.06);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .funil {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 8px 0 24px;
+    flex-wrap: wrap;
+  }
+  .funil-etapa {
+    flex: 1 1 160px;
+    background: #fff;
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+    position: relative;
+  }
+  .funil-etapa .rotulo { font-size: 12px; color: var(--texto-fraco); font-weight: 600; margin-bottom: 6px; }
+  .funil-etapa .valor { font-size: 24px; font-weight: 800; color: var(--azul); }
+  .funil-seta {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    color: var(--texto-fraco);
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 56px;
+  }
+  .funil-seta .pct { color: var(--verde); font-size: 14px; margin-top: 2px; }
+  .grafico-wrap { padding: 8px 4px 4px; }
+  .grafico-legenda {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    padding: 0 16px 12px;
+    font-size: 12px;
+    color: var(--texto-fraco);
+  }
+  .grafico-legenda span { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+  .grafico-legenda i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  table.tabela-campanhas { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.tabela-campanhas th, table.tabela-campanhas td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--borda);
+  }
+  table.tabela-campanhas th {
+    color: var(--texto-fraco);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  table.tabela-campanhas td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.tabela-campanhas tr:last-child td { border-bottom: none; }
+
   #login-tela {
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
     background:
@@ -368,6 +485,7 @@
     <div class="abas">
       <button class="aba-btn ativa" data-aba="conversas">Conversas</button>
       <button class="aba-btn" data-aba="agenda">Agenda por Município</button>
+      <button class="aba-btn" data-aba="campanhas">Campanhas</button>
     </div>
 
     <div id="painelConversas" class="secao">
@@ -388,11 +506,30 @@
       </div>
       <div class="secao-body" id="listaAgenda"></div>
     </div>
+
+    <div id="painelCampanhas" class="secao oculto">
+      <div class="secao-header">
+        <h2>Desempenho da campanha (Meta Ads)</h2>
+        <div class="campanhas-toolbar">
+          <select id="seletorPeriodo">
+            <option value="7">Últimos 7 dias</option>
+            <option value="14">Últimos 14 dias</option>
+            <option value="30" selected>Últimos 30 dias</option>
+            <option value="60">Últimos 60 dias</option>
+          </select>
+          <button class="btn-fraco" id="btnAtualizarCampanhas">Atualizar</button>
+        </div>
+      </div>
+      <div class="secao-body" id="corpoCampanhas">
+        <div class="vazio-msg">Carregando dados da campanha...</div>
+      </div>
+    </div>
   </main>
 
   <footer>Atualiza automaticamente a cada 20s</footer>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
 const LOGO_SVG = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
   <g fill="#1E9E5B">
@@ -460,36 +597,92 @@ function renderizar(dados) {
   renderizarAgenda();
 }
 
+function formatarTelefone(numero) {
+  if (!numero) return null;
+  const d = numero.replace(/\D/g, "");
+  if (d.length < 10) return numero;
+  const ddi = d.slice(0, d.length - 11) || "55";
+  const ddd = d.slice(-11, -9);
+  const parte1 = d.slice(-9, -4);
+  const parte2 = d.slice(-4);
+  return `+${ddi} ${ddd} ${parte1}-${parte2}`;
+}
+
+const threadsAbertas = new Set();
+
 function renderizarConversas() {
   const dados = dadosAtuais;
   if (!dados) return;
   const termo = document.getElementById("buscaConversas").value.trim().toLowerCase();
 
-  const lista = dados.conversas.filter((c) => !termo || c.telefone.toLowerCase().includes(termo));
+  const lista = dados.conversas.filter((c) => {
+    if (!termo) return true;
+    return c.telefone.toLowerCase().includes(termo) || (c.numeroReal || "").toLowerCase().includes(termo);
+  });
 
   if (lista.length === 0) {
     document.getElementById("listaConversas").innerHTML = `<div class="vazio-msg">Ninguém conversou com o bot ainda.</div>`;
     return;
   }
 
+  const idSeguro = (t) => t.replace(/[^a-zA-Z0-9]/g, "_");
+
   document.getElementById("listaConversas").innerHTML = lista
-    .map((c) => `
-      <div class="conversa-linha">
-        <div class="conversa-info">
-          <span class="conversa-tel">${c.telefone}</span>
-          <span class="conversa-meta">Última mensagem ${tempoRelativo(c.ultimaMensagem)}</span>
+    .map((c) => {
+      const numeroExibido = formatarTelefone(c.numeroReal) || c.telefone;
+      const aberta = threadsAbertas.has(c.telefone);
+      return `
+      <div class="conversa-item">
+        <div class="conversa-linha">
+          <div class="conversa-info">
+            <span class="conversa-tel">${numeroExibido}</span>
+            <span class="conversa-meta">Última mensagem ${tempoRelativo(c.ultimaMensagem)}</span>
+          </div>
+          <div class="conversa-acao">
+            <span class="status-badge ${c.pausado ? "pausado" : "ia"}">${c.pausado ? "Atendimento humano" : "IA respondendo"}</span>
+            <button class="btn-fraco" onclick="alternarConversa('${c.telefone}')">${aberta ? "Ocultar" : "Ver conversa"}</button>
+            ${
+              c.pausado
+                ? `<button class="btn-fraco" onclick="retomarIA('${c.telefone}')">Retomar IA</button>`
+                : `<button class="btn-ambar" onclick="pausarIA('${c.telefone}')">Pausar IA</button>`
+            }
+          </div>
         </div>
-        <div class="conversa-acao">
-          <span class="status-badge ${c.pausado ? "pausado" : "ia"}">${c.pausado ? "Atendimento humano" : "IA respondendo"}</span>
-          ${
-            c.pausado
-              ? `<button class="btn-fraco" onclick="retomarIA('${c.telefone}')">Retomar IA</button>`
-              : `<button class="btn-ambar" onclick="pausarIA('${c.telefone}')">Pausar IA</button>`
-          }
-        </div>
+        <div class="thread-conversa ${aberta ? "aberta" : ""}" id="thread-${idSeguro(c.telefone)}"></div>
       </div>
-    `)
+    `;
+    })
     .join("");
+
+  for (const tel of threadsAbertas) {
+    if (lista.some((c) => c.telefone === tel)) carregarThread(tel);
+  }
+}
+
+async function alternarConversa(telefone) {
+  if (threadsAbertas.has(telefone)) {
+    threadsAbertas.delete(telefone);
+  } else {
+    threadsAbertas.add(telefone);
+  }
+  renderizarConversas();
+}
+
+async function carregarThread(telefone) {
+  const chave = localStorage.getItem(LS_CHAVE);
+  const el = document.getElementById("thread-" + telefone.replace(/[^a-zA-Z0-9]/g, "_"));
+  if (!el) return;
+  try {
+    const resp = await fetch(`/api/conversa?jid=${encodeURIComponent(telefone)}&chave=${encodeURIComponent(chave)}`);
+    const dados = await resp.json();
+    const mensagens = dados.mensagens || [];
+    el.innerHTML = mensagens.length
+      ? mensagens.map((m) => `<div class="msg-bolha ${m.role === "cliente" ? "cliente" : "atendente"}">${m.text}</div>`).join("")
+      : `<div class="vazio-msg">Sem mensagens registradas ainda.</div>`;
+    el.scrollTop = el.scrollHeight;
+  } catch (e) {
+    el.innerHTML = `<div class="vazio-msg">Erro ao carregar conversa.</div>`;
+  }
 }
 
 function renderizarAgenda() {
@@ -603,6 +796,188 @@ function trocarAba(aba) {
   document.querySelectorAll(".aba-btn").forEach((b) => b.classList.toggle("ativa", b.dataset.aba === aba));
   document.getElementById("painelConversas").classList.toggle("oculto", aba !== "conversas");
   document.getElementById("painelAgenda").classList.toggle("oculto", aba !== "agenda");
+  document.getElementById("painelCampanhas").classList.toggle("oculto", aba !== "campanhas");
+  if (aba === "campanhas" && !campanhasCarregadas) buscarCampanhas();
+}
+
+const CORES = { cliques: "#1E4FA0", mensagens: "#B45309", agendamentos: "#1E9E5B" };
+let campanhasCarregadas = false;
+let graficoCampanhas = null;
+
+function formatarMoeda(v) {
+  return (v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatarNumero(v) {
+  return (v || 0).toLocaleString("pt-BR");
+}
+
+function formatarDataCurta(iso) {
+  const [, m, d] = iso.split("-");
+  return `${d}/${m}`;
+}
+
+async function buscarCampanhas() {
+  const corpo = document.getElementById("corpoCampanhas");
+  const dias = document.getElementById("seletorPeriodo").value;
+  const chave = localStorage.getItem(LS_CHAVE);
+  corpo.innerHTML = `<div class="vazio-msg">Carregando dados da campanha...</div>`;
+
+  try {
+    const resp = await fetch(`/api/campanhas?chave=${encodeURIComponent(chave)}&dias=${dias}`);
+    const dados = await resp.json();
+
+    if (!resp.ok) {
+      corpo.innerHTML = `<div class="campanhas-aviso">
+        <strong>Integração com Meta Ads ainda não configurada.</strong><br>
+        ${dados.erro || "Erro desconhecido."}<br><br>
+        Defina <code>FB_ACCESS_TOKEN</code> e <code>FB_AD_ACCOUNT_ID</code> no <code>.env</code> do bot e reinicie o processo.
+      </div>`;
+      return;
+    }
+
+    campanhasCarregadas = true;
+    renderizarCampanhas(dados);
+  } catch (e) {
+    corpo.innerHTML = `<div class="campanhas-aviso">Falha ao buscar dados da campanha: ${e.message}</div>`;
+  }
+}
+
+function renderizarCampanhas(dados) {
+  const corpo = document.getElementById("corpoCampanhas");
+  const { resumo, funil, porDia, porCampanha } = dados;
+
+  const custoPorClique = resumo.cliques ? resumo.gasto / resumo.cliques : 0;
+  const custoPorMensagem = resumo.mensagens ? resumo.gasto / resumo.mensagens : 0;
+  const custoPorAgendamento = funil.agendamentos ? resumo.gasto / funil.agendamentos : 0;
+
+  const cardsHtml = [
+    { rotulo: "Investimento no período", valor: formatarMoeda(resumo.gasto), cor: "var(--azul)" },
+    { rotulo: "Cliques no anúncio", valor: formatarNumero(resumo.cliques), cor: "var(--azul)" },
+    { rotulo: "Custo por clique", valor: formatarMoeda(custoPorClique), cor: "var(--azul)" },
+    { rotulo: "Mensagens iniciadas (Meta)", valor: formatarNumero(resumo.mensagens), cor: "var(--ambar)" },
+    { rotulo: "Custo por mensagem", valor: formatarMoeda(custoPorMensagem), cor: "var(--ambar)" },
+    { rotulo: "Agendamentos confirmados", valor: formatarNumero(funil.agendamentos), cor: "var(--verde)" },
+    { rotulo: "Custo por agendamento", valor: formatarMoeda(custoPorAgendamento), cor: "var(--verde)" },
+  ]
+    .map(
+      (c) => `
+      <div class="stat-card" style="--cor-tema:${c.cor};">
+        <div>
+          <div class="valor">${c.valor}</div>
+          <div class="rotulo">${c.rotulo}</div>
+        </div>
+      </div>`
+    )
+    .join("");
+
+  function etapaFunil(rotulo, valor) {
+    return `<div class="funil-etapa"><div class="rotulo">${rotulo}</div><div class="valor">${formatarNumero(valor)}</div></div>`;
+  }
+  function setaFunil(de, para) {
+    const pct = de ? Math.round((para / de) * 100) : 0;
+    return `<div class="funil-seta">→<span class="pct">${pct}%</span></div>`;
+  }
+
+  const funilHtml = `
+    <div class="funil">
+      ${etapaFunil("Cliques no anúncio", funil.cliques)}
+      ${setaFunil(funil.cliques, funil.mensagensMeta)}
+      ${etapaFunil("Mensagens iniciadas (Meta)", funil.mensagensMeta)}
+      ${setaFunil(funil.mensagensMeta, funil.conversasBot)}
+      ${etapaFunil("Conversas recebidas no bot", funil.conversasBot)}
+      ${setaFunil(funil.conversasBot, funil.agendamentos)}
+      ${etapaFunil("Agendamentos confirmados", funil.agendamentos)}
+    </div>
+  `;
+
+  const linhasTabela = porCampanha
+    .map(
+      (c) => `
+      <tr>
+        <td>${c.campanha}</td>
+        <td class="num">${formatarNumero(c.cliques)}</td>
+        <td class="num">${formatarNumero(c.mensagens)}</td>
+        <td class="num">${formatarMoeda(c.gasto)}</td>
+        <td class="num">${formatarMoeda(c.cliques ? c.gasto / c.cliques : 0)}</td>
+      </tr>`
+    )
+    .join("");
+
+  corpo.innerHTML = `
+    <div class="stats" style="margin-top:8px;">${cardsHtml}</div>
+    ${funilHtml}
+    <div class="secao" style="box-shadow:none; border:1px solid var(--borda);">
+      <div class="grafico-legenda">
+        <span><i style="background:${CORES.cliques}"></i>Cliques</span>
+        <span><i style="background:${CORES.mensagens}"></i>Mensagens iniciadas</span>
+        <span><i style="background:${CORES.agendamentos}"></i>Agendamentos</span>
+      </div>
+      <div class="grafico-wrap"><canvas id="graficoCampanhas" height="90"></canvas></div>
+    </div>
+    <div class="secao" style="box-shadow:none; border:1px solid var(--borda); margin-top:20px;">
+      <div class="secao-header"><h2>Por campanha</h2></div>
+      <div class="secao-body" style="overflow-x:auto;">
+        <table class="tabela-campanhas">
+          <thead><tr><th>Campanha</th><th class="num">Cliques</th><th class="num">Mensagens</th><th class="num">Gasto</th><th class="num">Custo/clique</th></tr></thead>
+          <tbody>${linhasTabela || `<tr><td colspan="5" class="vazio-msg">Sem campanhas no período.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  desenharGraficoCampanhas(porDia);
+}
+
+function desenharGraficoCampanhas(porDia) {
+  const ctx = document.getElementById("graficoCampanhas");
+  if (!ctx || typeof Chart === "undefined") return;
+  if (graficoCampanhas) graficoCampanhas.destroy();
+
+  graficoCampanhas = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: porDia.map((d) => formatarDataCurta(d.dia)),
+      datasets: [
+        {
+          label: "Cliques",
+          data: porDia.map((d) => d.cliques),
+          borderColor: CORES.cliques,
+          backgroundColor: CORES.cliques,
+          borderWidth: 2,
+          pointRadius: 3,
+          tension: 0.25,
+        },
+        {
+          label: "Mensagens iniciadas",
+          data: porDia.map((d) => d.mensagens),
+          borderColor: CORES.mensagens,
+          backgroundColor: CORES.mensagens,
+          borderWidth: 2,
+          pointRadius: 3,
+          tension: 0.25,
+        },
+        {
+          label: "Agendamentos",
+          data: porDia.map((d) => d.agendamentos),
+          borderColor: CORES.agendamentos,
+          backgroundColor: CORES.agendamentos,
+          borderWidth: 2,
+          pointRadius: 3,
+          tension: 0.25,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: "#F0F2F6" } },
+        x: { grid: { display: false } },
+      },
+    },
+  });
 }
 
 async function atualizar() {
@@ -651,6 +1026,8 @@ document.querySelectorAll(".aba-btn").forEach((b) => b.addEventListener("click",
 document.getElementById("buscaConversas").addEventListener("input", renderizarConversas);
 document.getElementById("buscaAgenda").addEventListener("input", renderizarAgenda);
 document.getElementById("btnExportar").addEventListener("click", exportarCSV);
+document.getElementById("btnAtualizarCampanhas").addEventListener("click", buscarCampanhas);
+document.getElementById("seletorPeriodo").addEventListener("change", buscarCampanhas);
 
 atualizar();
 setInterval(atualizar, 20000);
