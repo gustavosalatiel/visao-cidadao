@@ -490,7 +490,7 @@ function iniciarServidorHTTP(getSock) {
     res.send(html);
   });
 
-  app.listen(CFG.PORTA_HTTP, () => {
+  app.listen(CFG.PORTA_HTTP, "0.0.0.0", () => {
     console.log(
       `🌐 Servidor HTTP no ar: http://localhost:${CFG.PORTA_HTTP}/agendamento`
     );
