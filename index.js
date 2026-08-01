@@ -501,6 +501,7 @@ function iniciarServidorHTTP(getSock) {
   app.use(express.json());
 
   app.get("/", (req, res) => {
+    res.set("Cache-Control", "no-store");
     res.sendFile(path.join(__dirname, "painel.html"));
   });
 

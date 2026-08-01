@@ -609,10 +609,7 @@ function formatarTelefone(numero) {
   if (d.startsWith("55") && d.length === 13) {
     return `+55 ${d.slice(2, 4)} ${d.slice(4, 9)}-${d.slice(9)}`;
   }
-  if (d.startsWith("55") && d.length === 12) {
-    return `+55 ${d.slice(2, 4)} ${d.slice(4, 8)}-${d.slice(8)}`;
-  }
-  return `+${d}`;
+  return `+${d} (número pode estar incompleto)`;
 }
 
 const threadsAbertas = new Set();
