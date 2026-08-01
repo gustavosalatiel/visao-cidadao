@@ -239,8 +239,23 @@ function registrarIdEnviado(id) {
   }
 }
 
-const historicos = new Map();
-const MAX_HISTORICO = 20;
+const ARQ_HISTORICOS = path.join(DATA_DIR, "historicos.json");
+
+function carregarHistoricos() {
+  try {
+    const obj = JSON.parse(fs.readFileSync(ARQ_HISTORICOS, "utf8"));
+    return new Map(Object.entries(obj));
+  } catch {
+    return new Map();
+  }
+}
+
+function salvarHistoricos() {
+  fs.writeFileSync(ARQ_HISTORICOS, JSON.stringify(Object.fromEntries(historicos), null, 2));
+}
+
+const historicos = carregarHistoricos();
+const MAX_HISTORICO = 40;
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const buffersPendentes = new Map();
@@ -377,6 +392,7 @@ async function responder(sock, jid, textoRecebido) {
 
   hist.push({ role: "atendente", text: resposta });
   historicos.set(jid, hist);
+  salvarHistoricos();
 
   await espera(CFG.DELAY_MS);
   const enviada = await sock.sendMessage(jid, { text: resposta });
@@ -519,6 +535,40 @@ function iniciarServidorHTTP(getSock) {
     const jid = req.query.jid;
     if (!jid) return res.status(400).json({ erro: "Informe jid" });
     res.json({ mensagens: historicos.get(jid) || [] });
+  });
+
+  app.post("/api/enviar", async (req, res) => {
+    const { chave, jid, texto } = req.body || {};
+    if (chave !== CFG.CHAVE_API) {
+      return res.status(401).json({ erro: "Chave inválida" });
+    }
+    if (!jid || !texto || !texto.trim()) {
+      return res.status(400).json({ erro: "Informe jid e texto" });
+    }
+    const sock = getSock();
+    if (!sock) return res.status(503).json({ erro: "Bot ainda não conectado" });
+
+    try {
+      const enviada = await sock.sendMessage(jid, { text: texto });
+      registrarIdEnviado(enviada?.key?.id);
+      ultimoEnvioAutomatico.set(jid, Date.now());
+
+      let hist = historicos.get(jid) || [];
+      hist.push({ role: "atendente", text: texto });
+      if (hist.length > MAX_HISTORICO) hist = hist.slice(-MAX_HISTORICO);
+      historicos.set(jid, hist);
+      salvarHistoricos();
+
+      if (!pausados.has(jid)) {
+        pausados.add(jid);
+        salvarPausados(pausados);
+      }
+
+      res.json({ ok: true });
+    } catch (e) {
+      console.error("Erro ao enviar mensagem manual:", e.message);
+      res.status(500).json({ erro: "Falha ao enviar mensagem" });
+    }
   });
 
   function telefoneParaJid(telefone) {

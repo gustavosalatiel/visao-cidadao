@@ -276,6 +276,12 @@
     border-bottom-right-radius: 3px;
     text-align: right;
   }
+  .caixa-envio {
+    display: flex;
+    gap: 8px;
+    padding: 0 0 16px;
+  }
+  .caixa-envio input { max-width: none; flex: 1; }
 
   /* Agenda por município */
   .municipio-grupo {
@@ -600,12 +606,13 @@ function renderizar(dados) {
 function formatarTelefone(numero) {
   if (!numero) return null;
   const d = numero.replace(/\D/g, "");
-  if (d.length < 10) return numero;
-  const ddi = d.slice(0, d.length - 11) || "55";
-  const ddd = d.slice(-11, -9);
-  const parte1 = d.slice(-9, -4);
-  const parte2 = d.slice(-4);
-  return `+${ddi} ${ddd} ${parte1}-${parte2}`;
+  if (d.startsWith("55") && d.length === 13) {
+    return `+55 ${d.slice(2, 4)} ${d.slice(4, 9)}-${d.slice(9)}`;
+  }
+  if (d.startsWith("55") && d.length === 12) {
+    return `+55 ${d.slice(2, 4)} ${d.slice(4, 8)}-${d.slice(8)}`;
+  }
+  return `+${d}`;
 }
 
 const threadsAbertas = new Set();
@@ -649,6 +656,14 @@ function renderizarConversas() {
           </div>
         </div>
         <div class="thread-conversa ${aberta ? "aberta" : ""}" id="thread-${idSeguro(c.telefone)}"></div>
+        ${
+          aberta
+            ? `<div class="caixa-envio">
+                <input type="text" id="envio-${idSeguro(c.telefone)}" placeholder="Digite uma mensagem..." onkeydown="if(event.key==='Enter')enviarMensagem('${c.telefone}')" />
+                <button class="btn" onclick="enviarMensagem('${c.telefone}')">Enviar</button>
+              </div>`
+            : ""
+        }
       </div>
     `;
     })
@@ -656,6 +671,28 @@ function renderizarConversas() {
 
   for (const tel of threadsAbertas) {
     if (lista.some((c) => c.telefone === tel)) carregarThread(tel);
+  }
+}
+
+async function enviarMensagem(telefone) {
+  const idSeguro = telefone.replace(/[^a-zA-Z0-9]/g, "_");
+  const input = document.getElementById("envio-" + idSeguro);
+  const texto = input.value.trim();
+  if (!texto) return;
+  const chave = localStorage.getItem(LS_CHAVE);
+  input.disabled = true;
+  try {
+    await fetch("/api/enviar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chave, jid: telefone, texto }),
+    });
+    input.value = "";
+    await carregarThread(telefone);
+    atualizar();
+  } finally {
+    input.disabled = false;
+    input.focus();
   }
 }
 
