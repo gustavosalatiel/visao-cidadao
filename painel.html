@@ -1048,23 +1048,41 @@ async function pausarIA(telefone) {
 function exportarCSV() {
   if (!dadosAtuais) return;
   const cidadePorHorario = new Map();
+  const ordemHorario = new Map();
+  let ordem = 0;
   for (const grupo of dadosAtuais.cidades) {
-    for (const h of grupo.horarios) cidadePorHorario.set(h, grupo.cidade);
+    for (const h of grupo.horarios) {
+      cidadePorHorario.set(h, grupo.cidade);
+      ordemHorario.set(h, ordem++);
+    }
   }
+  const ordemCidade = new Map(dadosAtuais.cidades.map((g, i) => [g.cidade, i]));
+
   const porCidade = new Map();
   for (const a of dadosAtuais.agendamentos) {
     const cidade = cidadePorHorario.get(a.horario) || "Outros horários (fora da lista padrão)";
     if (!porCidade.has(cidade)) porCidade.set(cidade, []);
     porCidade.get(cidade).push(a);
   }
+
+  const cidadesOrdenadas = [...porCidade.keys()].sort(
+    (a, b) => (ordemCidade.has(a) ? ordemCidade.get(a) : Infinity) - (ordemCidade.has(b) ? ordemCidade.get(b) : Infinity)
+  );
+
   const linhas = [["cidade", "nome", "telefone", "horario", "origem", "criadoEm"]];
-  for (const [cidade, lista] of porCidade) {
+  for (const cidade of cidadesOrdenadas) {
+    const lista = porCidade.get(cidade).slice().sort((x, y) => {
+      const ox = ordemHorario.has(x.horario) ? ordemHorario.get(x.horario) : Infinity;
+      const oy = ordemHorario.has(y.horario) ? ordemHorario.get(y.horario) : Infinity;
+      if (ox !== oy) return ox - oy;
+      return (x.criadoEm || "").localeCompare(y.criadoEm || "");
+    });
     for (const a of lista) {
       linhas.push([cidade, a.nome, a.telefone, a.horario, a.origem || "", a.criadoEm || ""]);
     }
   }
   const csv = linhas.map((l) => l.map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
