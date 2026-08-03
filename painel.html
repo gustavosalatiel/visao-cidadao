@@ -1045,6 +1045,15 @@ async function pausarIA(telefone) {
   atualizar();
 }
 
+function partesDoHorario(h) {
+  const texto = h || "";
+  const mHora = texto.match(/às\s+(\d{2}:\d{2})/i);
+  const hora = mHora ? mHora[1] : "";
+  const mDia = texto.match(/^(.*?)\s+(?:em|no|na)\s+.+?\s+às\s+\d{2}:\d{2}/i);
+  const dia = mDia ? mDia[1] : texto.replace(/\s+às\s+\d{2}:\d{2}.*$/i, "");
+  return { dia, hora };
+}
+
 function exportarCSV() {
   if (!dadosAtuais) return;
   const cidadePorHorario = new Map();
@@ -1069,7 +1078,7 @@ function exportarCSV() {
     (a, b) => (ordemCidade.has(a) ? ordemCidade.get(a) : Infinity) - (ordemCidade.has(b) ? ordemCidade.get(b) : Infinity)
   );
 
-  const linhas = [["cidade", "nome", "telefone", "horario", "origem", "criadoEm"]];
+  const linhas = [["cidade", "nome", "telefone", "dia", "horario"]];
   for (const cidade of cidadesOrdenadas) {
     const lista = porCidade.get(cidade).slice().sort((x, y) => {
       const ox = ordemHorario.has(x.horario) ? ordemHorario.get(x.horario) : Infinity;
@@ -1078,7 +1087,8 @@ function exportarCSV() {
       return (x.criadoEm || "").localeCompare(y.criadoEm || "");
     });
     for (const a of lista) {
-      linhas.push([cidade, a.nome, a.telefone, a.horario, a.origem || "", a.criadoEm || ""]);
+      const { dia, hora } = partesDoHorario(a.horario);
+      linhas.push([cidade, a.nome, a.telefone, dia, hora]);
     }
   }
   const csv = linhas.map((l) => l.map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")).join("\n");
