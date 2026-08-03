@@ -24,7 +24,7 @@
     --raio: 14px;
     --sombra: 0 1px 2px rgba(16,38,94,.06), 0 6px 16px rgba(16,38,94,.08);
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0;
     background:
@@ -131,7 +131,11 @@
     color: var(--texto-fraco);
     border-radius: 9px;
     cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background .15s ease, color .15s ease;
   }
+  .aba-btn:hover:not(.ativa) { background: var(--bg); color: var(--azul); }
   .aba-btn.ativa {
     background: linear-gradient(135deg, var(--azul2), var(--azul));
     color: #fff;
@@ -201,6 +205,11 @@
     width: 100%;
     max-width: 380px;
     box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    animation: modal-entrar .18s ease;
+  }
+  @keyframes modal-entrar {
+    from { opacity: 0; transform: translateY(8px) scale(.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
   .modal-box h3 { margin: 0 0 16px; color: var(--azul); font-size: 17px; }
   .modal-box label { display: block; font-size: 13px; font-weight: 600; color: var(--texto-fraco); margin: 12px 0 4px; }
@@ -216,8 +225,10 @@
     cursor: pointer;
     white-space: nowrap;
     box-shadow: 0 3px 8px rgba(22,38,94,.25);
+    transition: filter .15s ease, transform .1s ease;
   }
   .btn:hover { filter: brightness(1.07); }
+  .btn:active { transform: scale(.97); }
   .btn-fraco {
     background: var(--verde-fraco);
     border: 1px solid #BEE9D2;
@@ -228,8 +239,10 @@
     cursor: pointer;
     color: var(--verde);
     white-space: nowrap;
+    transition: background .15s ease, transform .1s ease;
   }
   .btn-fraco:hover { background: #CFF1DD; }
+  .btn-fraco:active { transform: scale(.97); }
   .btn-ambar {
     background: var(--ambar-fraco);
     color: var(--ambar);
@@ -240,8 +253,10 @@
     font-weight: 600;
     cursor: pointer;
     white-space: nowrap;
+    transition: background .15s ease, transform .1s ease;
   }
   .btn-ambar:hover { background: #FBE3BE; }
+  .btn-ambar:active { transform: scale(.97); }
 
   /* Conversas */
   .conversa-linha {
@@ -330,7 +345,9 @@
     font-weight: 800;
     background: linear-gradient(135deg, var(--azul2), var(--azul));
     color: #fff;
+    transition: filter .15s ease;
   }
+  .municipio-grupo summary:hover { filter: brightness(1.08); }
   .municipio-grupo summary .badge-cidade {
     display: inline-block;
     padding: 3px 12px;
@@ -351,7 +368,9 @@
     font-weight: 700;
     background: var(--verde-fraco);
     color: #146B3E;
+    transition: background .15s ease;
   }
+  .horario-sub summary:hover { background: #CFF1DD; }
   .badge {
     display: inline-block;
     padding: 2px 10px;
@@ -522,6 +541,42 @@
   .qr-conexao-wrap p { font-size: 13px; color: var(--texto-fraco); max-width: 400px; margin: 12px auto 0; }
   .oculto { display: none !important; }
   footer { text-align: center; font-size: 12px; color: var(--texto-fraco); padding: 24px; }
+
+  @media (max-width: 640px) {
+    header { padding: 12px 16px; }
+    .wordmark-linha2 { font-size: 16px; }
+    #btnSair { padding: 7px 12px; }
+    main { padding: 14px; }
+    .stats { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .stat-card { padding: 12px 14px; gap: 10px; }
+    .stat-card .valor { font-size: 21px; }
+    .stat-icone { width: 36px; height: 36px; font-size: 17px; }
+    .abas {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .abas::-webkit-scrollbar { display: none; }
+    .aba-btn { padding: 9px 14px; font-size: 13px; }
+    .secao-header { padding: 14px 16px; }
+    .secao-header > div { width: 100%; flex-direction: column; align-items: stretch; }
+    .secao-body { padding: 4px 14px 14px; }
+    input[type="text"], input[type="password"], select {
+      max-width: none;
+      font-size: 16px;
+    }
+    .conversa-acao { width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+    .msg-bolha { max-width: 88%; }
+    .lista-pessoas li { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .status-conexao-card { flex-direction: column; align-items: center; text-align: center; }
+    #btnGerarQR { margin-left: 0 !important; margin-top: 8px; }
+    #bannerStatus { flex-direction: column; text-align: center; }
+    .qr-conexao-wrap img { width: 100%; max-width: 260px; height: auto; }
+    .modal-box { padding: 18px; }
+    .funil-etapa { flex: 1 1 100%; }
+    .funil-seta { flex-direction: row; min-width: 0; padding: 4px 0; }
+  }
 </style>
 </head>
 <body>
