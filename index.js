@@ -536,6 +536,8 @@ function iniciarServidorHTTP(getSock) {
       conversas,
       statusConexao,
       temQR: !!qrAtual,
+      conectadoDesde: conectadoEm ? new Date(conectadoEm).toISOString() : null,
+      numeroBot: CFG.NUMERO_BOT,
     });
   });
 

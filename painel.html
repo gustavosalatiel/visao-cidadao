@@ -470,6 +470,26 @@
   #bannerStatus .banner-titulo { font-weight: 800; font-size: 15px; margin-bottom: 2px; }
   #bannerStatus .banner-texto { font-size: 13px; }
   #bannerStatus img { width: 160px; height: 160px; border-radius: 10px; background: #fff; padding: 6px; }
+  .status-conexao-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px;
+    border-radius: 12px;
+    flex-wrap: wrap;
+  }
+  .status-conexao-card.ok { background: var(--verde-fraco); border: 1px solid #BEE9D2; }
+  .status-conexao-card.alerta { background: var(--ambar-fraco); border: 1px solid #F3D9B5; }
+  .status-conexao-card.erro { background: #FDE8E8; border: 1px solid #F5B5B5; }
+  .status-conexao-bolinha { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+  .status-conexao-bolinha.ok { background: var(--verde); box-shadow: 0 0 0 4px var(--verde-fraco); }
+  .status-conexao-bolinha.alerta { background: var(--ambar); box-shadow: 0 0 0 4px var(--ambar-fraco); }
+  .status-conexao-bolinha.erro { background: #C0392B; box-shadow: 0 0 0 4px #FDE8E8; }
+  .status-conexao-titulo { font-size: 16px; font-weight: 800; }
+  .status-conexao-sub { font-size: 13px; color: var(--texto-fraco); margin-top: 2px; }
+  .qr-conexao-wrap { text-align: center; margin-top: 20px; }
+  .qr-conexao-wrap img { width: 260px; height: 260px; border-radius: 12px; border: 1px solid var(--borda); padding: 10px; background: #fff; }
+  .qr-conexao-wrap p { font-size: 13px; color: var(--texto-fraco); max-width: 400px; margin: 12px auto 0; }
   .oculto { display: none !important; }
   footer { text-align: center; font-size: 12px; color: var(--texto-fraco); padding: 24px; }
 </style>
@@ -508,6 +528,7 @@
       <button class="aba-btn ativa" data-aba="conversas">Conversas</button>
       <button class="aba-btn" data-aba="agenda">Agenda por Município</button>
       <button class="aba-btn" data-aba="campanhas">Campanhas</button>
+      <button class="aba-btn" data-aba="conexao">Conexão</button>
     </div>
 
     <div id="painelConversas" class="secao">
@@ -545,6 +566,13 @@
       <div class="secao-body" id="corpoCampanhas">
         <div class="vazio-msg">Carregando dados da campanha...</div>
       </div>
+    </div>
+
+    <div id="painelConexao" class="secao oculto">
+      <div class="secao-header">
+        <h2>Conexão com o WhatsApp</h2>
+      </div>
+      <div class="secao-body" id="corpoConexao"></div>
     </div>
   </main>
 
@@ -618,6 +646,7 @@ function renderizar(dados) {
 
   renderizarConversas();
   renderizarAgenda();
+  if (abaAtiva === "conexao") renderizarConexao(dados);
 }
 
 let ultimoQR = null;
@@ -892,7 +921,49 @@ function trocarAba(aba) {
   document.getElementById("painelConversas").classList.toggle("oculto", aba !== "conversas");
   document.getElementById("painelAgenda").classList.toggle("oculto", aba !== "agenda");
   document.getElementById("painelCampanhas").classList.toggle("oculto", aba !== "campanhas");
+  document.getElementById("painelConexao").classList.toggle("oculto", aba !== "conexao");
   if (aba === "campanhas" && !campanhasCarregadas) buscarCampanhas();
+  if (aba === "conexao" && dadosAtuais) renderizarConexao(dadosAtuais);
+}
+
+async function renderizarConexao(dados) {
+  const corpo = document.getElementById("corpoConexao");
+  const status = dados.statusConexao;
+
+  const infoStatus = {
+    conectado: { classe: "ok", titulo: "✅ Conectado", sub: dados.conectadoDesde ? `Conectado desde ${new Date(dados.conectadoDesde).toLocaleString("pt-BR")}` : "" },
+    aguardando_qr: { classe: "alerta", titulo: "📱 Aguardando pareamento", sub: "Escaneie o QR code abaixo pra conectar" },
+    reconectando: { classe: "alerta", titulo: "🔄 Reconectando...", sub: "O bot está tentando se reconectar automaticamente" },
+    conectando: { classe: "alerta", titulo: "⏳ Iniciando...", sub: "Aguarde, o bot está subindo" },
+    desconectado: { classe: "erro", titulo: "⚠️ Desconectado", sub: "A sessão caiu e precisa de um pareamento novo" },
+  };
+  const info = infoStatus[status] || infoStatus.desconectado;
+
+  corpo.innerHTML = `
+    <div class="status-conexao-card ${info.classe}">
+      <div class="status-conexao-bolinha ${info.classe}"></div>
+      <div>
+        <div class="status-conexao-titulo">${info.titulo}</div>
+        <div class="status-conexao-sub">${info.sub}</div>
+        ${dados.numeroBot ? `<div class="status-conexao-sub">Número: +${dados.numeroBot}</div>` : ""}
+      </div>
+    </div>
+    <div id="areaQRConexao"></div>
+  `;
+
+  if (dados.temQR) {
+    const area = document.getElementById("areaQRConexao");
+    area.innerHTML = `<div class="qr-conexao-wrap"><img id="imgQRConexao" src="" alt="QR code" /><p>Abra o WhatsApp no celular do número do bot → Aparelhos conectados → Conectar aparelho → aponte a câmera pra este código. Ele se renova sozinho a cada atualização da página.</p></div>`;
+    try {
+      const chave = localStorage.getItem(LS_CHAVE);
+      const resp = await fetch(`/api/qr?chave=${encodeURIComponent(chave)}`);
+      if (resp.ok) {
+        const dadosQR = await resp.json();
+        const img = document.getElementById("imgQRConexao");
+        if (img) img.src = dadosQR.imagem;
+      }
+    } catch (e) {}
+  }
 }
 
 const CORES = { cliques: "#1E4FA0", mensagens: "#B45309", agendamentos: "#1E9E5B" };
