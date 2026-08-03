@@ -418,6 +418,7 @@ async function iniciarBot() {
 
   if (!sock.authState.creds.registered) {
     setTimeout(async () => {
+      if (sock.authState.creds.registered) return;
       try {
         const codigo = await sock.requestPairingCode(CFG.NUMERO_BOT);
         console.log("\n==============================================");
