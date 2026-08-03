@@ -388,6 +388,8 @@ async function responder(sock, jid, textoRecebido) {
   let hist = historicos.get(jid) || [];
   hist.push({ role: "cliente", text: texto });
   if (hist.length > MAX_HISTORICO) hist = hist.slice(-MAX_HISTORICO);
+  historicos.set(jid, hist);
+  salvarHistoricos();
 
   let resposta;
   try {
