@@ -404,10 +404,18 @@ async function responder(sock, jid, textoRecebido) {
   ultimoEnvioAutomatico.set(jid, Date.now());
 }
 
+let geracaoAtual = 0;
+
 async function iniciarBot() {
+  const minhaGeracao = ++geracaoAtual;
+
   const { state, saveCreds } = await useMultiFileAuthState(
     path.join(DATA_DIR, "auth")
   );
+
+  if (minhaGeracao !== geracaoAtual) {
+    return null;
+  }
 
   const sock = makeWASocket({
     auth: state,
@@ -419,6 +427,7 @@ async function iniciarBot() {
   let timerCodigo = null;
   if (!sock.authState.creds.registered) {
     timerCodigo = setTimeout(async () => {
+      if (minhaGeracao !== geracaoAtual) return;
       if (sock.authState.creds.registered) return;
       try {
         const codigo = await sock.requestPairingCode(CFG.NUMERO_BOT);
@@ -435,6 +444,7 @@ async function iniciarBot() {
   }
 
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
+    if (minhaGeracao !== geracaoAtual) return;
     if (qr) {
       qrAtual = qr;
       statusConexao = "aguardando_qr";
@@ -456,7 +466,8 @@ async function iniciarBot() {
       console.log("Conexão caiu.", deveReconectar ? "Reconectando..." : "Deslogado.");
       if (deveReconectar)
         setTimeout(async () => {
-          sockAtual = await iniciarBot();
+          const novoSock = await iniciarBot();
+          if (novoSock) sockAtual = novoSock;
         }, 2000);
     }
   });
@@ -580,7 +591,8 @@ function iniciarServidorHTTP(getSock) {
       fs.rmSync(path.join(DATA_DIR, "auth"), { recursive: true, force: true });
       qrAtual = null;
       statusConexao = "conectando";
-      sockAtual = await iniciarBot();
+      const novoSock = await iniciarBot();
+      if (novoSock) sockAtual = novoSock;
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ erro: "Falha ao reconectar" });
