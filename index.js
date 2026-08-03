@@ -316,7 +316,9 @@ SEU OBJETIVO:
 INFORMAÇÕES DA EMPRESA (use só isso, não invente):
 ${CFG.INFORMACOES}
 
-ENDEREÇO: ${CFG.ENDERECO}
+LOCAL DE ATENDIMENTO POR CIDADE (use isso se a pessoa perguntar onde vai ser o atendimento dela):
+${Object.entries(CFG.ENDERECOS_POR_CIDADE).map(([cidade, endereco]) => `- ${cidade}: ${endereco}`).join("\n")}
+- Se a cidade da pessoa não estiver nessa lista acima, diga: "${CFG.ENDERECO}"
 
 HORÁRIOS DISPONÍVEIS PARA AGENDAR:
 ${CFG.HORARIOS.map((h) => `- ${h}`).join("\n")}
@@ -425,7 +427,8 @@ async function responder(sock, jid, textoRecebido) {
   try {
     await sock.sendPresenceUpdate("composing", jid);
   } catch {}
-  await espera(CFG.DELAY_MS);
+  const atrasoDigitando = 2000 + Math.random() * 3000;
+  await espera(atrasoDigitando);
   const enviada = await sock.sendMessage(jid, { text: resposta });
   try {
     await sock.sendPresenceUpdate("paused", jid);
@@ -739,12 +742,13 @@ function iniciarServidorHTTP(getSock) {
 
     try {
       salvarAgendamento({ nome, telefone, horario, origem: "site" });
+      const endereco = CFG.ENDERECOS_POR_CIDADE[extrairCidade(horario)] || CFG.ENDERECO;
       await sock.sendMessage(jid, {
         text:
           `Oi, ${nome}! Aqui é o ${CFG.NOME_EMPRESA} 😊\n\n` +
           `Vi que você agendou seu exame de vista gratuito pelo nosso site. ` +
           `Tá confirmado:\n\n` +
-          `📅 ${horario}\n📍 ${CFG.ENDERECO}\n\n` +
+          `📅 ${horario}\n📍 ${endereco}\n\n` +
           `O exame leva uns 30 minutos e não precisa levar nada. ` +
           `Qualquer dúvida é só me chamar por aqui!`,
       });

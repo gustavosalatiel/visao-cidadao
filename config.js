@@ -2,6 +2,13 @@ module.exports = {
   NOME_EMPRESA: "Visão Cidadão",
   NOME_ATENDENTE: "Gessica",
   ENDERECO: "O ponto de atendimento exato é confirmado pela equipe conforme a cidade do dia escolhido",
+  ENDERECOS_POR_CIDADE: {
+    "Sena Madureira-AC": "Comunidade Batista Vida — Rua Padre Egídio, 856, Centro",
+    "Xapuri-AC": "Igreja AD Brás Madureira — Rua Cel. Brandão, 1805, Bairro Cerâmica",
+    "Boca do Acre-AM": "Clínica Spaço Profissional, no Piquiá",
+    "Acrelândia-AC": "Igreja AD Brás Madureira — Rua Minas Gerais",
+    "Guajará-Mirim-RO": "SINTERO — Avenida 15 de Novembro (de frente ao Hotel Quinzão)",
+  },
   CIDADE: "Acre, Amazonas e Rondônia (mutirão itinerante — uma cidade por dia)",
   HORARIOS: [
     "Quinta-feira 13 de agosto em Sena Madureira-AC às 08:00",
@@ -66,7 +73,6 @@ module.exports = {
   NUMERO_BOT: process.env.NUMERO_BOT || "5500000000000",
   PORTA_HTTP: process.env.PORT || process.env.PORTA_HTTP || 3000,
   CHAVE_API: process.env.CHAVE_API || "troque-esta-chave-123",
-  DELAY_MS: 2500,
   FB_ACCESS_TOKEN: process.env.FB_ACCESS_TOKEN || "",
   FB_AD_ACCOUNT_ID: process.env.FB_AD_ACCOUNT_ID || "",
   FB_API_VERSION: process.env.FB_API_VERSION || "v21.0",
