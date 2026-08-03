@@ -416,8 +416,9 @@ async function iniciarBot() {
 
   sock.ev.on("creds.update", saveCreds);
 
+  let timerCodigo = null;
   if (!sock.authState.creds.registered) {
-    setTimeout(async () => {
+    timerCodigo = setTimeout(async () => {
       if (sock.authState.creds.registered) return;
       try {
         const codigo = await sock.requestPairingCode(CFG.NUMERO_BOT);
@@ -441,17 +442,22 @@ async function iniciarBot() {
       qrcode.generate(qr, { small: true });
     }
     if (connection === "open") {
+      clearTimeout(timerCodigo);
       conectadoEm = Date.now();
       qrAtual = null;
       statusConexao = "conectado";
       console.log("✅ Bot conectado ao WhatsApp!");
     }
     if (connection === "close") {
+      clearTimeout(timerCodigo);
       const deveReconectar =
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       statusConexao = deveReconectar ? "reconectando" : "desconectado";
       console.log("Conexão caiu.", deveReconectar ? "Reconectando..." : "Deslogado.");
-      if (deveReconectar) iniciarBot();
+      if (deveReconectar)
+        setTimeout(async () => {
+          sockAtual = await iniciarBot();
+        }, 2000);
     }
   });
 
