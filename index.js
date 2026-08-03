@@ -821,40 +821,6 @@ function iniciarServidorHTTP(getSock) {
     }
   });
 
-  app.get("/api/backups", (req, res) => {
-    if (req.query.chave !== CFG.CHAVE_API) {
-      return res.status(401).json({ erro: "Chave inválida" });
-    }
-    try {
-      const dirBackups = path.join(DATA_DIR, "backups");
-      const datas = fs
-        .readdirSync(dirBackups)
-        .filter((f) => /^agendamentos_\d{4}-\d{2}-\d{2}\.json$/.test(f))
-        .map((f) => f.match(/\d{4}-\d{2}-\d{2}/)[0])
-        .sort()
-        .reverse();
-      res.json({ datas });
-    } catch {
-      res.json({ datas: [] });
-    }
-  });
-
-  app.get("/api/backups/:data", (req, res) => {
-    if (req.query.chave !== CFG.CHAVE_API) {
-      return res.status(401).json({ erro: "Chave inválida" });
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(req.params.data)) {
-      return res.status(400).json({ erro: "Data inválida" });
-    }
-    const arquivo = path.join(DATA_DIR, "backups", `agendamentos_${req.params.data}.json`);
-    try {
-      const agendamentos = JSON.parse(fs.readFileSync(arquivo, "utf8"));
-      res.json({ agendamentos });
-    } catch {
-      res.status(404).json({ erro: "Backup não encontrado" });
-    }
-  });
-
   app.get("/api/campanhas", async (req, res) => {
     if (req.query.chave !== CFG.CHAVE_API) {
       return res.status(401).json({ erro: "Chave inválida" });

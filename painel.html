@@ -634,8 +634,6 @@
           <input type="text" id="buscaAgenda" placeholder="Buscar nome ou telefone..." />
           <button class="btn" onclick="abrirModalAgendamento()">+ Novo agendamento</button>
           <button class="btn-fraco" id="btnExportar">Exportar CSV</button>
-          <select id="seletorBackups" style="max-width:180px;"><option value="">Backups anteriores...</option></select>
-          <button class="btn-fraco" onclick="baixarBackupSelecionado()">Baixar backup</button>
         </div>
       </div>
       <div class="secao-body" id="listaAgenda"></div>
@@ -1138,43 +1136,6 @@ function exportarCSV() {
   baixarCSVString(gerarCSVDeAgendamentos(dadosAtuais.agendamentos), "agendamentos_visao_cidadao.csv");
 }
 
-async function carregarListaBackups() {
-  const chave = localStorage.getItem(LS_CHAVE);
-  try {
-    const resp = await fetch(`/api/backups?chave=${encodeURIComponent(chave)}`);
-    const d = await resp.json();
-    const select = document.getElementById("seletorBackups");
-    select.innerHTML =
-      `<option value="">Backups anteriores...</option>` +
-      (d.datas || [])
-        .map((data) => {
-          const [, mes, dia] = data.split("-");
-          return `<option value="${data}">${dia}/${mes}</option>`;
-        })
-        .join("");
-  } catch (e) {}
-}
-
-async function baixarBackupSelecionado() {
-  const data = document.getElementById("seletorBackups").value;
-  if (!data) {
-    alert("Escolha uma data de backup na lista.");
-    return;
-  }
-  const chave = localStorage.getItem(LS_CHAVE);
-  try {
-    const resp = await fetch(`/api/backups/${data}?chave=${encodeURIComponent(chave)}`);
-    const d = await resp.json();
-    if (!resp.ok) {
-      alert(d.erro || "Backup não encontrado.");
-      return;
-    }
-    baixarCSVString(gerarCSVDeAgendamentos(d.agendamentos || []), `agendamentos_${data}.csv`);
-  } catch (e) {
-    alert("Erro ao baixar backup.");
-  }
-}
-
 function trocarAba(aba) {
   abaAtiva = aba;
   document.querySelectorAll(".aba-btn").forEach((b) => b.classList.toggle("ativa", b.dataset.aba === aba));
@@ -1441,8 +1402,6 @@ function desenharGraficoCampanhas(porDia) {
   });
 }
 
-let backupsCarregados = false;
-
 async function atualizar() {
   const chave = localStorage.getItem(LS_CHAVE);
   if (!chave) return mostrarLogin();
@@ -1451,10 +1410,6 @@ async function atualizar() {
     renderizar(dados);
     elLogin().classList.add("oculto");
     elPainel().classList.remove("oculto");
-    if (!backupsCarregados) {
-      backupsCarregados = true;
-      carregarListaBackups();
-    }
   } catch (e) {
     mostrarLogin();
   }
