@@ -325,7 +325,14 @@ function processarBuffer(sock, jid) {
     .finally(() => respondendoAgora.delete(jid));
 }
 
-function promptSistema() {
+function resolverTelefone(jid) {
+  return jid.endsWith("@lid") ? contatos[jid]?.numeroReal || jid : jid.replace("@s.whatsapp.net", "");
+}
+
+function promptSistema(jid) {
+  const telefone = resolverTelefone(jid);
+  const agendamentosContato = carregarAgendamentos().filter((a) => a.telefone === telefone);
+
   return `Você é o atendimento oficial do ${CFG.NOME_EMPRESA}, em ${CFG.CIDADE}.
 Você atende pelo WhatsApp pessoas que clicaram em um anúncio de EXAME DE VISTA GRATUITO.
 
@@ -358,8 +365,14 @@ ${Object.entries(CFG.ENDERECOS_POR_CIDADE).map(([cidade, endereco]) => `- ${cida
 HORÁRIOS DISPONÍVEIS PARA AGENDAR:
 ${CFG.HORARIOS.map((h) => `- ${h}`).join("\n")}
 
+AGENDAMENTOS JÁ FEITOS POR ESSE CONTATO (mesmo número de WhatsApp):
+${agendamentosContato.length ? agendamentosContato.map((a) => `- ${a.nome}: ${a.horario}`).join("\n") : "Nenhum agendamento anterior encontrado pra esse contato."}
+
 REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
-- Quando a pessoa CONFIRMAR um horário e você já souber o nome dela, finalize sua resposta com esta marcação EXATA em uma linha separada:
+- ANTES de confirmar um agendamento, olhe a lista AGENDAMENTOS JÁ FEITOS POR ESSE CONTATO acima. Se o NOME que a pessoa está agendando agora JÁ aparece nessa lista, NÃO agende de novo direto — pergunte primeiro algo como: "Vi que [nome] já tem um agendamento marcado pra [horário anterior]. Quer agendar mais um horário (por exemplo pra outra pessoa da família), ou prefere mudar esse agendamento pra um horário novo?" Só prossiga depois que ela responder essa pergunta.
+- Se ela confirmar que quer um agendamento A MAIS (nome diferente, ou mesmo nome mas quer mesmo duplicar), use a marcação ###AGENDAR### normalmente, como descrito abaixo.
+- Se ela disser que quer TROCAR/MUDAR o horário de um agendamento que já existe, NÃO use ###AGENDAR###. Em vez disso finalize a resposta com esta marcação EXATA em uma linha separada: ###REAGENDAR###{"nome":"NOME DA PESSOA","horarioAntigo":"HORÁRIO ANTIGO EXATO (copie certinho da lista de agendamentos já feitos acima)","horarioNovo":"HORÁRIO NOVO ESCOLHIDO"} — isso substitui o agendamento antigo pelo novo, sem duplicar na agenda.
+- Quando a pessoa CONFIRMAR um horário NOVO (que não é troca de um já existente) e você já souber o nome dela, finalize sua resposta com esta marcação EXATA em uma linha separada:
 ###AGENDAR###{"nome":"NOME DA PESSOA","horario":"HORÁRIO ESCOLHIDO"}
 - Essa marcação é invisível pra pessoa (o sistema remove). Use apenas UMA vez, na hora que fechar o agendamento.
 - Na mesma mensagem, confirme pra pessoa: a *data* (sempre por extenso, tipo "21 de agosto", nunca "21/08"), o *horário* e o *local* em negrito (asterisco de cada lado) + que é gratuito.
@@ -367,7 +380,7 @@ REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 - Se perguntarem sobre preços de óculos, responda, mas deixe claro que a compra nunca é obrigatória.`;
 }
 
-async function perguntarIA(historico) {
+async function perguntarIA(historico, jid) {
   const contents = historico.map((m) => ({
     role: m.role === "cliente" ? "user" : "model",
     parts: [{ text: m.text }],
@@ -379,7 +392,7 @@ async function perguntarIA(historico) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: promptSistema() }] },
+        system_instruction: { parts: [{ text: promptSistema(jid) }] },
         contents,
         generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
       }),
@@ -403,9 +416,7 @@ function processarResposta(textoIA, jid) {
   if (m) {
     try {
       const dados = JSON.parse(m[1]);
-      const telefone = jid.endsWith("@lid")
-        ? contatos[jid]?.numeroReal || jid
-        : jid.replace("@s.whatsapp.net", "");
+      const telefone = resolverTelefone(jid);
       const JANELA_DUPLICADO_MS = 24 * 60 * 60 * 1000;
       const jaExiste = carregarAgendamentos().some(
         (a) =>
@@ -426,6 +437,30 @@ function processarResposta(textoIA, jid) {
       console.error("Falha ao ler agendamento da IA:", e.message);
     }
     texto = texto.replace(marca, "").trim();
+  }
+
+  const marcaReagendar = /###REAGENDAR###\s*(\{[\s\S]*?\})/;
+  const mReagendar = texto.match(marcaReagendar);
+  if (mReagendar) {
+    try {
+      const dados = JSON.parse(mReagendar[1]);
+      const telefone = resolverTelefone(jid);
+      const lista = carregarAgendamentos().filter(
+        (a) => !(a.telefone === telefone && a.horario === dados.horarioAntigo)
+      );
+      lista.push({
+        nome: dados.nome,
+        horario: dados.horarioNovo,
+        telefone,
+        origem: "whatsapp",
+        criadoEm: new Date().toISOString(),
+      });
+      fs.writeFileSync(ARQ_AGENDAMENTOS, JSON.stringify(lista, null, 2));
+      console.log("🔄 AGENDAMENTO ALTERADO:", dados.nome, "-", dados.horarioAntigo, "->", dados.horarioNovo);
+    } catch (e) {
+      console.error("Falha ao reagendar:", e.message);
+    }
+    texto = texto.replace(marcaReagendar, "").trim();
   }
 
   const marcaTransferir = /###TRANSFERIR_HUMANO###/;
@@ -453,7 +488,7 @@ async function responder(sock, jid, textoRecebido) {
 
   let resposta;
   try {
-    resposta = await perguntarIA(hist);
+    resposta = await perguntarIA(hist, jid);
   } catch (e) {
     console.error("Erro na IA:", e.message);
     resposta =

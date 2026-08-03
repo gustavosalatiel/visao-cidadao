@@ -1118,7 +1118,12 @@ async function carregarListaBackups() {
     const select = document.getElementById("seletorBackups");
     select.innerHTML =
       `<option value="">Backups anteriores...</option>` +
-      (d.datas || []).map((data) => `<option value="${data}">${data}</option>`).join("");
+      (d.datas || [])
+        .map((data) => {
+          const [, mes, dia] = data.split("-");
+          return `<option value="${data}">${dia}/${mes}</option>`;
+        })
+        .join("");
   } catch (e) {}
 }
 
