@@ -466,6 +466,8 @@ async function iniciarBot() {
 
       if (msg.key.fromMe) {
         const limparId = (j) => (j || "").split("@")[0].split(":")[0];
+        const parteNumerica = limparId(jid);
+        const pareceContatoReal = /^\d{8,15}$/.test(parteNumerica);
         if (limparId(jid) === limparId(sock.user?.id)) continue;
         if (Date.now() - conectadoEm < JANELA_POS_CONEXAO_MS) continue;
         if (texto.trim().toLowerCase() === "/retomar") {
@@ -474,6 +476,8 @@ async function iniciarBot() {
             console.log("▶️  IA retomada para:", jid.replace("@s.whatsapp.net", ""));
           }
         } else if (
+          texto.trim() &&
+          pareceContatoReal &&
           !idsEnviadosPeloBot.has(msg.key.id) &&
           Date.now() - (ultimoEnvioAutomatico.get(jid) || 0) >= JANELA_ECO_MS &&
           !pausados.has(jid)
