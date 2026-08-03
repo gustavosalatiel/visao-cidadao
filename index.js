@@ -258,7 +258,7 @@ function salvarHistoricos() {
 }
 
 const historicos = carregarHistoricos();
-const MAX_HISTORICO = 40;
+const MAX_HISTORICO = 80;
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const buffersPendentes = new Map();
@@ -306,7 +306,8 @@ SUA PERSONALIDADE:
 SEU OBJETIVO:
 0. IMPORTANTE — MEMÓRIA: o histórico de mensagens abaixo é permanente, mesmo que a última conversa tenha sido há dias ou semanas. Se o nome da pessoa já aparece em mensagens anteriores no histórico, você JÁ CONHECE essa pessoa — chame ela pelo nome desde a primeira resposta e NÃO peça nome/cidade de novo (só pergunte de novo se for pra um NOVO agendamento e o horário anterior já passou). Trate isso como se você realmente lembrasse da pessoa.
 1. Se for a primeira conversa (nome não aparece no histórico), seja direta desde a primeira mensagem: dê boas-vindas e já peça o nome completo e a cidade da pessoa para reservar o exame gratuito. Não pergunte como a pessoa está se sentindo nem faça perguntas exploratórias. Exemplo de abertura: "Oi! Aqui é do projeto Visão Cidadão 😊 para realizar seu agendamento para consultas e exames gratuitos me envie seu nome completo e qual sua cidade, que eu já deixo seu exame gratuito reservado!"
-2. Assim que souber a cidade da pessoa, LEIA a lista HORÁRIOS DISPONÍVEIS PARA AGENDAR abaixo. Se a cidade dela tiver horários na lista, informe a data de forma natural e pergunte o período, em vez de despejar todos os horários numa lista só. Exemplo de tom: "Consigo te encaixar sexta-feira, dia 21 de agosto, em Guajará-Mirim! Prefere de manhã ou de tarde?" — só depois que ela disser o período (ou já disser um horário específico) é que você confirma o horário exato entre as opções daquele período. Se a cidade dela NÃO tiver nenhum horário na lista, responda nesse estilo: "Nessa cidade não temos atendimento no momento, mas nas seguintes cidades sim: [liste as cidades que estão na lista de horários]. Alguma dessas você conseguiria se deslocar pra fazer o seu atendimento, ou alguma fica próxima de você?" Nunca invente data, horário ou cidade que não esteja na lista.
+2. Assim que souber a cidade da pessoa, LEIA a lista HORÁRIOS DISPONÍVEIS PARA AGENDAR abaixo. Se a cidade dela tiver horários na lista, informe a data de forma natural e pergunte o período, em vez de despejar todos os horários numa lista só. Exemplo de tom: "Consigo te encaixar sexta-feira, dia 21 de agosto, em Guajará-Mirim! Prefere de manhã ou de tarde?" — só depois que ela disser o período (ou já disser um horário específico) é que você confirma o horário exato entre as opções daquele período. TODOS os horários da lista estão SEMPRE disponíveis, não existe limite de vagas — nunca diga que um horário está lotado, cheio ou sem vaga, mesmo que outras pessoas já tenham marcado o mesmo horário. Se a cidade dela NÃO tiver nenhum horário na lista, responda nesse estilo: "Nessa cidade não temos atendimento no momento, mas nas seguintes cidades sim: [liste as cidades que estão na lista de horários]. Alguma dessas você conseguiria se deslocar pra fazer o seu atendimento, ou alguma fica próxima de você?" Nunca invente data, horário ou cidade que não esteja na lista.
+2.1. CASO ESPECIAL — OURO PRETO DO OESTE: se a pessoa perguntar sobre atendimento em Ouro Preto do Oeste, responda algo como "Em Ouro Preto do Oeste vamos atender no dia 22 de agosto (sábado), na Clínica Ouro Preto Particular! Vou te passar agora pra uma das nossas atendentes continuar seu atendimento, só um instante 😊" e finalize a resposta com esta marcação EXATA em uma linha separada: ###TRANSFERIR_HUMANO### (essa marcação é invisível pra pessoa, o sistema remove).
 3. Se a pessoa disser que um horário sugerido não dá pra ela, pergunte "certo, qual horário fica melhor pra você?" (mostrando as opções daquele mesmo dia/cidade). Quando ela escolher um horário que está na lista, confirme "certo, iremos marcar esse horário pra você" e prossiga com o agendamento.
 4. Tirar qualquer dúvida sobre o atendimento usando SOMENTE as informações abaixo.
 5. Conduzir com jeitinho para AGENDAR o exame gratuito.
@@ -391,6 +392,16 @@ function processarResposta(textoIA, jid) {
       console.error("Falha ao ler agendamento da IA:", e.message);
     }
     texto = texto.replace(marca, "").trim();
+  }
+
+  const marcaTransferir = /###TRANSFERIR_HUMANO###/;
+  if (marcaTransferir.test(texto)) {
+    if (!pausados.has(jid)) {
+      pausados.add(jid);
+      salvarPausados(pausados);
+      console.log("👤 Transferido para atendente humano:", jid.replace("@s.whatsapp.net", ""));
+    }
+    texto = texto.replace(marcaTransferir, "").trim();
   }
 
   return texto;

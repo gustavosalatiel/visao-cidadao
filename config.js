@@ -66,6 +66,7 @@ module.exports = {
 - Atendemos qualquer idade.
 - É um mutirão itinerante: passamos por uma cidade diferente do Acre, Amazonas e Rondônia a cada dia, conforme a agenda.
 - A pessoa deve escolher a data e a cidade da lista de horários disponíveis mais perto dela.
+- Não há limite de vagas por horário: todos os horários da lista estão sempre disponíveis, mesmo que outras pessoas já tenham marcado o mesmo horário.
 - Depois do exame, o médico passa um atestado de horas pra pessoa levar no trabalho, na escola ou onde precisar, comprovando a ausência.
 - Exames e avaliações que fazemos: retinografia, biomicroscopia, tonometria, refração computadorizada, avaliação cirúrgica, encaminhamentos e laudos cirúrgicos.
 `,
