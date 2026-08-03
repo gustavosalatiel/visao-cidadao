@@ -409,8 +409,14 @@ async function responder(sock, jid, textoRecebido) {
   historicos.set(jid, hist);
   salvarHistoricos();
 
+  try {
+    await sock.sendPresenceUpdate("composing", jid);
+  } catch {}
   await espera(CFG.DELAY_MS);
   const enviada = await sock.sendMessage(jid, { text: resposta });
+  try {
+    await sock.sendPresenceUpdate("paused", jid);
+  } catch {}
   registrarIdEnviado(enviada?.key?.id);
   ultimoEnvioAutomatico.set(jid, Date.now());
 }
