@@ -1066,6 +1066,10 @@ function trocarAba(aba) {
   document.getElementById("painelConexao").classList.toggle("oculto", aba !== "conexao");
   if (aba === "campanhas" && !campanhasCarregadas) buscarCampanhas();
   if (aba === "conexao" && dadosAtuais) renderizarConexao(dadosAtuais);
+  if (aba !== "conexao" && intervaloQR) {
+    clearInterval(intervaloQR);
+    intervaloQR = null;
+  }
 }
 
 async function renderizarConexao(dados) {
@@ -1096,17 +1100,30 @@ async function renderizarConexao(dados) {
 
   if (dados.temQR) {
     const area = document.getElementById("areaQRConexao");
-    area.innerHTML = `<div class="qr-conexao-wrap"><img id="imgQRConexao" src="" alt="QR code" /><p>Abra o WhatsApp no celular do número do bot → Aparelhos conectados → Conectar aparelho → aponte a câmera pra este código. Ele se renova sozinho a cada atualização da página.</p></div>`;
-    try {
-      const chave = localStorage.getItem(LS_CHAVE);
-      const resp = await fetch(`/api/qr?chave=${encodeURIComponent(chave)}`);
-      if (resp.ok) {
-        const dadosQR = await resp.json();
-        const img = document.getElementById("imgQRConexao");
-        if (img) img.src = dadosQR.imagem;
-      }
-    } catch (e) {}
+    area.innerHTML = `<div class="qr-conexao-wrap"><img id="imgQRConexao" src="" alt="QR code" /><p>Abra o WhatsApp no celular do número do bot → Aparelhos conectados → Conectar aparelho → aponte a câmera pra este código. Ele se renova sozinho a cada poucos segundos, então pode escanear assim que a tela abrir.</p></div>`;
+    await atualizarSoQR();
+    if (!intervaloQR) intervaloQR = setInterval(atualizarSoQR, 4000);
+  } else if (intervaloQR) {
+    clearInterval(intervaloQR);
+    intervaloQR = null;
   }
+}
+
+let intervaloQR = null;
+
+async function atualizarSoQR() {
+  const chave = localStorage.getItem(LS_CHAVE);
+  try {
+    const resp = await fetch(`/api/qr?chave=${encodeURIComponent(chave)}`);
+    if (!resp.ok) {
+      clearInterval(intervaloQR);
+      intervaloQR = null;
+      return;
+    }
+    const dadosQR = await resp.json();
+    const img = document.getElementById("imgQRConexao");
+    if (img) img.src = dadosQR.imagem;
+  } catch (e) {}
 }
 
 async function gerarNovoQR() {
