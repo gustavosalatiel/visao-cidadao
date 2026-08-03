@@ -392,6 +392,9 @@
   }
   .lista-pessoas li:last-child { border-bottom: none; }
   .lista-pessoas .tel { color: var(--texto-fraco); font-size: 13px; }
+  .lista-pessoas li.transferido { opacity: .55; }
+  .lista-pessoas li.transferido .nome-pessoa { text-decoration: line-through; }
+  .check-transferido { display: flex; align-items: center; gap: 8px; cursor: pointer; }
   .vazio-msg { padding: 12px 0 12px 18px; color: var(--texto-fraco); font-size: 13px; }
 
   /* Campanhas */
@@ -917,6 +920,31 @@ async function carregarThread(telefone) {
   }
 }
 
+function linhaAgendamento(p, comHorario) {
+  const rotulo = comHorario ? `${escaparHtml(p.nome)} — ${escaparHtml(p.horario)}` : escaparHtml(p.nome);
+  return `
+    <li class="${p.transferido ? "transferido" : ""}">
+      <label class="check-transferido">
+        <input type="checkbox" ${p.transferido ? "checked" : ""} onchange="marcarTransferido('${p.criadoEm}', this.checked)" />
+        <span class="nome-pessoa">${rotulo}</span>
+      </label>
+      <span class="tel">${escaparHtml(p.telefone)}</span>
+    </li>
+  `;
+}
+
+async function marcarTransferido(criadoEm, transferido) {
+  const chave = localStorage.getItem(LS_CHAVE);
+  try {
+    await fetch("/api/agendamento-transferido", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chave, criadoEm, transferido }),
+    });
+    atualizar();
+  } catch (e) {}
+}
+
 function renderizarAgenda() {
   const dados = dadosAtuais;
   if (!dados) return;
@@ -953,7 +981,7 @@ function renderizarAgenda() {
             ${
               pessoas.length === 0
                 ? `<div class="vazio-msg">Nenhum agendamento ainda.</div>`
-                : `<ul class="lista-pessoas">${pessoas.map((p) => `<li><span>${escaparHtml(p.nome)}</span><span class="tel">${escaparHtml(p.telefone)}</span></li>`).join("")}</ul>`
+                : `<ul class="lista-pessoas">${pessoas.map((p) => linhaAgendamento(p, false)).join("")}</ul>`
             }
           </details>
         `;
@@ -979,7 +1007,7 @@ function renderizarAgenda() {
     html += `
       <details class="municipio-grupo" open>
         <summary><span>Outros horários (fora da lista padrão)</span><span class="badge-cidade">${outros.length}</span></summary>
-        <ul class="lista-pessoas">${outros.map((p) => `<li><span>${escaparHtml(p.nome)} — ${escaparHtml(p.horario)}</span><span class="tel">${escaparHtml(p.telefone)}</span></li>`).join("")}</ul>
+        <ul class="lista-pessoas">${outros.map((p) => linhaAgendamento(p, true)).join("")}</ul>
       </details>
     `;
   }

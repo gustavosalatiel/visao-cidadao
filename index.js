@@ -36,38 +36,6 @@ function salvarAgendamento(dados) {
   console.log("📅 NOVO AGENDAMENTO:", dados.nome, "-", dados.horario);
 }
 
-const RESET_HORA_UTC = 5; // 00:00 no Acre (UTC-5) = 05:00 UTC
-
-function agendarResetDiarioDeAgendamentos() {
-  function proximoDisparoMs() {
-    const agora = new Date();
-    const alvo = new Date(
-      Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), agora.getUTCDate(), RESET_HORA_UTC, 0, 5)
-    );
-    if (alvo <= agora) alvo.setUTCDate(alvo.getUTCDate() + 1);
-    return alvo - agora;
-  }
-  function resetar() {
-    try {
-      const hoje = new Date().toISOString().slice(0, 10);
-      const dirBackups = path.join(DATA_DIR, "backups");
-      fs.mkdirSync(dirBackups, { recursive: true });
-      const atual = carregarAgendamentos();
-      fs.writeFileSync(
-        path.join(dirBackups, `agendamentos_${hoje}.json`),
-        JSON.stringify(atual, null, 2)
-      );
-      fs.writeFileSync(ARQ_AGENDAMENTOS, JSON.stringify([], null, 2));
-      console.log(
-        `🗓️  Planilha de agendamentos zerada automaticamente (00:00 no Acre). Backup salvo em backups/agendamentos_${hoje}.json`
-      );
-    } catch (e) {
-      console.error("Erro ao zerar planilha diária:", e.message);
-    }
-    setTimeout(resetar, proximoDisparoMs());
-  }
-  setTimeout(resetar, proximoDisparoMs());
-}
 
 const ARQ_PAUSADOS = path.join(DATA_DIR, "pausados.json");
 
@@ -772,6 +740,20 @@ function iniciarServidorHTTP(getSock) {
     res.json({ ok: true });
   });
 
+  app.post("/api/agendamento-transferido", (req, res) => {
+    const { chave, criadoEm, transferido } = req.body || {};
+    if (chave !== CFG.CHAVE_API) {
+      return res.status(401).json({ erro: "Chave inválida" });
+    }
+    if (!criadoEm) return res.status(400).json({ erro: "Informe criadoEm" });
+    const lista = carregarAgendamentos();
+    const item = lista.find((a) => a.criadoEm === criadoEm);
+    if (!item) return res.status(404).json({ erro: "Agendamento não encontrado" });
+    item.transferido = !!transferido;
+    fs.writeFileSync(ARQ_AGENDAMENTOS, JSON.stringify(lista, null, 2));
+    res.json({ ok: true });
+  });
+
   function telefoneParaJid(telefone) {
     return telefone.endsWith("@lid")
       ? telefone
@@ -980,7 +962,6 @@ let sockAtual = null;
   }
   sockAtual = await iniciarBot();
   iniciarServidorHTTP(() => sockAtual);
-  agendarResetDiarioDeAgendamentos();
 })().catch((e) => {
   console.error("Erro fatal ao iniciar o bot:", e.message);
   process.exit(1);
