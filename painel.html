@@ -631,6 +631,8 @@
           <input type="text" id="buscaAgenda" placeholder="Buscar nome ou telefone..." />
           <button class="btn" onclick="abrirModalAgendamento()">+ Novo agendamento</button>
           <button class="btn-fraco" id="btnExportar">Exportar CSV</button>
+          <select id="seletorBackups" style="max-width:180px;"><option value="">Backups anteriores...</option></select>
+          <button class="btn-fraco" onclick="baixarBackupSelecionado()">Baixar backup</button>
         </div>
       </div>
       <div class="secao-body" id="listaAgenda"></div>
@@ -1054,8 +1056,7 @@ function partesDoHorario(h) {
   return { dia, hora };
 }
 
-function exportarCSV() {
-  if (!dadosAtuais) return;
+function gerarCSVDeAgendamentos(agendamentos) {
   const cidadePorHorario = new Map();
   const ordemHorario = new Map();
   let ordem = 0;
@@ -1068,7 +1069,7 @@ function exportarCSV() {
   const ordemCidade = new Map(dadosAtuais.cidades.map((g, i) => [g.cidade, i]));
 
   const porCidade = new Map();
-  for (const a of dadosAtuais.agendamentos) {
+  for (const a of agendamentos) {
     const cidade = cidadePorHorario.get(a.horario) || "Outros horários (fora da lista padrão)";
     if (!porCidade.has(cidade)) porCidade.set(cidade, []);
     porCidade.get(cidade).push(a);
@@ -1091,14 +1092,54 @@ function exportarCSV() {
       linhas.push([cidade, a.nome, a.telefone, dia, hora]);
     }
   }
-  const csv = linhas.map((l) => l.map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  return linhas.map((l) => l.map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")).join("\n");
+}
+
+function baixarCSVString(csv, nomeArquivo) {
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "agendamentos_visao_cidadao.csv";
+  a.download = nomeArquivo;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function exportarCSV() {
+  if (!dadosAtuais) return;
+  baixarCSVString(gerarCSVDeAgendamentos(dadosAtuais.agendamentos), "agendamentos_visao_cidadao.csv");
+}
+
+async function carregarListaBackups() {
+  const chave = localStorage.getItem(LS_CHAVE);
+  try {
+    const resp = await fetch(`/api/backups?chave=${encodeURIComponent(chave)}`);
+    const d = await resp.json();
+    const select = document.getElementById("seletorBackups");
+    select.innerHTML =
+      `<option value="">Backups anteriores...</option>` +
+      (d.datas || []).map((data) => `<option value="${data}">${data}</option>`).join("");
+  } catch (e) {}
+}
+
+async function baixarBackupSelecionado() {
+  const data = document.getElementById("seletorBackups").value;
+  if (!data) {
+    alert("Escolha uma data de backup na lista.");
+    return;
+  }
+  const chave = localStorage.getItem(LS_CHAVE);
+  try {
+    const resp = await fetch(`/api/backups/${data}?chave=${encodeURIComponent(chave)}`);
+    const d = await resp.json();
+    if (!resp.ok) {
+      alert(d.erro || "Backup não encontrado.");
+      return;
+    }
+    baixarCSVString(gerarCSVDeAgendamentos(d.agendamentos || []), `agendamentos_${data}.csv`);
+  } catch (e) {
+    alert("Erro ao baixar backup.");
+  }
 }
 
 function trocarAba(aba) {
@@ -1367,6 +1408,8 @@ function desenharGraficoCampanhas(porDia) {
   });
 }
 
+let backupsCarregados = false;
+
 async function atualizar() {
   const chave = localStorage.getItem(LS_CHAVE);
   if (!chave) return mostrarLogin();
@@ -1375,6 +1418,10 @@ async function atualizar() {
     renderizar(dados);
     elLogin().classList.add("oculto");
     elPainel().classList.remove("oculto");
+    if (!backupsCarregados) {
+      backupsCarregados = true;
+      carregarListaBackups();
+    }
   } catch (e) {
     mostrarLogin();
   }
