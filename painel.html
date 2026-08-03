@@ -1047,9 +1047,21 @@ async function pausarIA(telefone) {
 
 function exportarCSV() {
   if (!dadosAtuais) return;
-  const linhas = [["nome", "telefone", "horario", "origem", "criadoEm"]];
+  const cidadePorHorario = new Map();
+  for (const grupo of dadosAtuais.cidades) {
+    for (const h of grupo.horarios) cidadePorHorario.set(h, grupo.cidade);
+  }
+  const porCidade = new Map();
   for (const a of dadosAtuais.agendamentos) {
-    linhas.push([a.nome, a.telefone, a.horario, a.origem || "", a.criadoEm || ""]);
+    const cidade = cidadePorHorario.get(a.horario) || "Outros horários (fora da lista padrão)";
+    if (!porCidade.has(cidade)) porCidade.set(cidade, []);
+    porCidade.get(cidade).push(a);
+  }
+  const linhas = [["cidade", "nome", "telefone", "horario", "origem", "criadoEm"]];
+  for (const [cidade, lista] of porCidade) {
+    for (const a of lista) {
+      linhas.push([cidade, a.nome, a.telefone, a.horario, a.origem || "", a.criadoEm || ""]);
+    }
   }
   const csv = linhas.map((l) => l.map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
