@@ -366,12 +366,25 @@ function processarResposta(textoIA, jid) {
   if (m) {
     try {
       const dados = JSON.parse(m[1]);
-      salvarAgendamento({
-        nome: dados.nome,
-        horario: dados.horario,
-        telefone: jid.replace("@s.whatsapp.net", ""),
-        origem: "whatsapp",
-      });
+      const telefone = jid.endsWith("@lid")
+        ? contatos[jid]?.numeroReal || jid
+        : jid.replace("@s.whatsapp.net", "");
+      const JANELA_DUPLICADO_MS = 24 * 60 * 60 * 1000;
+      const jaExiste = carregarAgendamentos().some(
+        (a) =>
+          a.telefone === telefone &&
+          a.horario === dados.horario &&
+          a.nome === dados.nome &&
+          Date.now() - new Date(a.criadoEm).getTime() < JANELA_DUPLICADO_MS
+      );
+      if (!jaExiste) {
+        salvarAgendamento({
+          nome: dados.nome,
+          horario: dados.horario,
+          telefone,
+          origem: "whatsapp",
+        });
+      }
     } catch (e) {
       console.error("Falha ao ler agendamento da IA:", e.message);
     }
