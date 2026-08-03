@@ -692,6 +692,10 @@ const LOGO_SVG = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
 </svg>`;
 document.querySelectorAll(".logo-slot").forEach((el) => (el.innerHTML = LOGO_SVG));
 
+function escaparHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 const LS_CHAVE = "visao_cidadao_chave";
 let dadosAtuais = null;
 let abaAtiva = "conversas";
@@ -903,7 +907,7 @@ async function carregarThread(telefone) {
     const dados = await resp.json();
     const mensagens = dados.mensagens || [];
     el.innerHTML = mensagens.length
-      ? mensagens.map((m) => `<div class="msg-bolha ${m.role === "cliente" ? "cliente" : "atendente"}">${m.text}</div>`).join("")
+      ? mensagens.map((m) => `<div class="msg-bolha ${m.role === "cliente" ? "cliente" : "atendente"}">${escaparHtml(m.text)}</div>`).join("")
       : `<div class="vazio-msg">Sem mensagens registradas ainda.</div>`;
     el.scrollTop = el.scrollHeight;
   } catch (e) {
@@ -947,7 +951,7 @@ function renderizarAgenda() {
             ${
               pessoas.length === 0
                 ? `<div class="vazio-msg">Nenhum agendamento ainda.</div>`
-                : `<ul class="lista-pessoas">${pessoas.map((p) => `<li><span>${p.nome}</span><span class="tel">${p.telefone}</span></li>`).join("")}</ul>`
+                : `<ul class="lista-pessoas">${pessoas.map((p) => `<li><span>${escaparHtml(p.nome)}</span><span class="tel">${escaparHtml(p.telefone)}</span></li>`).join("")}</ul>`
             }
           </details>
         `;
@@ -973,7 +977,7 @@ function renderizarAgenda() {
     html += `
       <details class="municipio-grupo" open>
         <summary><span>Outros horários (fora da lista padrão)</span><span class="badge-cidade">${outros.length}</span></summary>
-        <ul class="lista-pessoas">${outros.map((p) => `<li><span>${p.nome} — ${p.horario}</span><span class="tel">${p.telefone}</span></li>`).join("")}</ul>
+        <ul class="lista-pessoas">${outros.map((p) => `<li><span>${escaparHtml(p.nome)} — ${escaparHtml(p.horario)}</span><span class="tel">${escaparHtml(p.telefone)}</span></li>`).join("")}</ul>
       </details>
     `;
   }

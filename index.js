@@ -263,6 +263,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const buffersPendentes = new Map();
 const DEBOUNCE_MS = 2500;
+const respondendoAgora = new Set();
 
 function bufferizarMensagem(sock, jid, texto) {
   let pendente = buffersPendentes.get(jid);
@@ -272,15 +273,23 @@ function bufferizarMensagem(sock, jid, texto) {
   }
   pendente.textos.push(texto);
   clearTimeout(pendente.timer);
-  pendente.timer = setTimeout(async () => {
-    const textos = pendente.textos;
-    buffersPendentes.delete(jid);
-    try {
-      await responder(sock, jid, textos.join("\n"));
-    } catch (e) {
-      console.error("Erro ao responder:", e.message);
-    }
-  }, DEBOUNCE_MS);
+  pendente.timer = setTimeout(() => processarBuffer(sock, jid), DEBOUNCE_MS);
+}
+
+function processarBuffer(sock, jid) {
+  if (respondendoAgora.has(jid)) {
+    const pendente = buffersPendentes.get(jid);
+    if (pendente) pendente.timer = setTimeout(() => processarBuffer(sock, jid), 1000);
+    return;
+  }
+  const pendente = buffersPendentes.get(jid);
+  if (!pendente) return;
+  const textos = pendente.textos;
+  buffersPendentes.delete(jid);
+  respondendoAgora.add(jid);
+  responder(sock, jid, textos.join("\n"))
+    .catch((e) => console.error("Erro ao responder:", e.message))
+    .finally(() => respondendoAgora.delete(jid));
 }
 
 function promptSistema() {
@@ -476,7 +485,7 @@ async function iniciarBot() {
     if (type !== "notify") return;
     for (const msg of messages) {
       const jid = msg.key.remoteJid;
-      if (!jid || jid.endsWith("@g.us") || jid.endsWith("@broadcast")) continue;
+      if (!jid || jid.endsWith("@g.us") || jid.endsWith("@broadcast") || jid.endsWith("@newsletter")) continue;
 
       const texto =
         msg.message?.conversation ||
@@ -832,4 +841,7 @@ let sockAtual = null;
   }
   sockAtual = await iniciarBot();
   iniciarServidorHTTP(() => sockAtual);
-})();
+})().catch((e) => {
+  console.error("Erro fatal ao iniciar o bot:", e.message);
+  process.exit(1);
+});
