@@ -55,7 +55,7 @@ module.exports = {
   ],
   INFORMACOES: `
 - O exame de vista é 100% GRATUITO. Não vendemos nada, não tem custo nenhum em momento algum.
-- Não precisa levar nenhum documento, só chegar no horário marcado.
+- A pessoa precisa levar um documento de identificação com foto (CPF ou RG) no dia do atendimento.
 - Atendemos qualquer idade.
 - É um mutirão itinerante: passamos por uma cidade diferente do Acre, Amazonas e Rondônia a cada dia, conforme a agenda.
 - A pessoa deve escolher a data e a cidade da lista de horários disponíveis mais perto dela.
