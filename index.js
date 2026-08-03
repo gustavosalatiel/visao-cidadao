@@ -4,6 +4,7 @@ const {
   DisconnectReason,
 } = require("@whiskeysockets/baileys");
 const qrcode = require("qrcode-terminal");
+const gerarQRImagem = require("qrcode");
 const pino = require("pino");
 const express = require("express");
 const fs = require("fs");
@@ -230,6 +231,8 @@ const ultimoEnvioAutomatico = new Map();
 const JANELA_ECO_MS = 8000;
 let conectadoEm = 0;
 const JANELA_POS_CONEXAO_MS = 15000;
+let qrAtual = null;
+let statusConexao = "conectando";
 
 function registrarIdEnviado(id) {
   if (!id) return;
@@ -430,16 +433,21 @@ async function iniciarBot() {
 
   sock.ev.on("connection.update", ({ connection, lastDisconnect, qr }) => {
     if (qr) {
+      qrAtual = qr;
+      statusConexao = "aguardando_qr";
       console.log("\n📱 Ou escaneie o QR code:");
       qrcode.generate(qr, { small: true });
     }
     if (connection === "open") {
       conectadoEm = Date.now();
+      qrAtual = null;
+      statusConexao = "conectado";
       console.log("✅ Bot conectado ao WhatsApp!");
     }
     if (connection === "close") {
       const deveReconectar =
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      statusConexao = deveReconectar ? "reconectando" : "desconectado";
       console.log("Conexão caiu.", deveReconectar ? "Reconectando..." : "Deslogado.");
       if (deveReconectar) iniciarBot();
     }
@@ -526,7 +534,22 @@ function iniciarServidorHTTP(getSock) {
       agendamentos: carregarAgendamentos(),
       pausados: [...pausados].map((jid) => jid.replace("@s.whatsapp.net", "")),
       conversas,
+      statusConexao,
+      temQR: !!qrAtual,
     });
+  });
+
+  app.get("/api/qr", async (req, res) => {
+    if (req.query.chave !== CFG.CHAVE_API) {
+      return res.status(401).json({ erro: "Chave inválida" });
+    }
+    if (!qrAtual) return res.status(404).json({ erro: "Nenhum QR code disponível agora" });
+    try {
+      const imagemDataUrl = await gerarQRImagem.toDataURL(qrAtual, { width: 300 });
+      res.json({ imagem: imagemDataUrl });
+    } catch (e) {
+      res.status(500).json({ erro: "Falha ao gerar QR code" });
+    }
   });
 
   app.get("/api/conversa", (req, res) => {

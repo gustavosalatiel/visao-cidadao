@@ -455,6 +455,21 @@
   .login-card p:not(.wordmark-linha1):not(.wordmark-linha2) { font-size: 13px; color: var(--texto-fraco); margin: 0 0 20px; }
   .login-card input { max-width: none; margin-bottom: 12px; }
   .login-card .erro { color: #B91C1C; font-size: 13px; margin-top: 8px; min-height: 18px; }
+  #bannerStatus {
+    border-radius: var(--raio);
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    box-shadow: var(--sombra);
+  }
+  #bannerStatus.critico { background: #FDE8E8; border: 1px solid #F5B5B5; color: #8A1F1F; }
+  #bannerStatus.atencao { background: var(--ambar-fraco); border: 1px solid #F3D9B5; color: var(--ambar); }
+  #bannerStatus .banner-titulo { font-weight: 800; font-size: 15px; margin-bottom: 2px; }
+  #bannerStatus .banner-texto { font-size: 13px; }
+  #bannerStatus img { width: 160px; height: 160px; border-radius: 10px; background: #fff; padding: 6px; }
   .oculto { display: none !important; }
   footer { text-align: center; font-size: 12px; color: var(--texto-fraco); padding: 24px; }
 </style>
@@ -486,6 +501,7 @@
   </header>
 
   <main>
+    <div id="bannerStatus" class="oculto"></div>
     <div class="stats" id="stats"></div>
 
     <div class="abas">
@@ -573,6 +589,7 @@ function tempoRelativo(iso) {
 
 function renderizar(dados) {
   dadosAtuais = dados;
+  atualizarBannerStatus(dados);
 
   const totalAgendamentos = dados.agendamentos.length;
   const totalConversas = dados.conversas.length;
@@ -601,6 +618,50 @@ function renderizar(dados) {
 
   renderizarConversas();
   renderizarAgenda();
+}
+
+let ultimoQR = null;
+
+async function atualizarBannerStatus(dados) {
+  const banner = document.getElementById("bannerStatus");
+  const status = dados.statusConexao;
+
+  if (status === "conectado") {
+    banner.classList.add("oculto");
+    ultimoQR = null;
+    return;
+  }
+
+  banner.classList.remove("oculto");
+
+  if (status === "aguardando_qr" && dados.temQR) {
+    banner.className = "atencao";
+    banner.innerHTML = `
+      <div>
+        <div class="banner-titulo">📱 WhatsApp desconectado — escaneie pra reconectar</div>
+        <div class="banner-texto">Abra o WhatsApp no celular do número do bot → Aparelhos conectados → Conectar aparelho → aponte a câmera pro código ao lado.</div>
+      </div>
+      <img id="imgQR" src="" alt="QR code" />
+    `;
+    try {
+      const chave = localStorage.getItem(LS_CHAVE);
+      const resp = await fetch(`/api/qr?chave=${encodeURIComponent(chave)}`);
+      if (resp.ok) {
+        const dadosQR = await resp.json();
+        const img = document.getElementById("imgQR");
+        if (img) img.src = dadosQR.imagem;
+      }
+    } catch (e) {}
+    return;
+  }
+
+  banner.className = "critico";
+  banner.innerHTML = `
+    <div>
+      <div class="banner-titulo">⚠️ WhatsApp desconectado</div>
+      <div class="banner-texto">O bot não está respondendo no momento. Aguardando reconexão automática...</div>
+    </div>
+  `;
 }
 
 function formatarTelefone(numero) {
