@@ -947,6 +947,7 @@ async function renderizarConexao(dados) {
         <div class="status-conexao-sub">${info.sub}</div>
         ${dados.numeroBot ? `<div class="status-conexao-sub">Número: +${dados.numeroBot}</div>` : ""}
       </div>
+      ${status !== "conectado" ? `<button id="btnGerarQR" class="btn" style="margin-left:auto" onclick="gerarNovoQR()">🔄 Gerar novo QR Code</button>` : ""}
     </div>
     <div id="areaQRConexao"></div>
   `;
@@ -964,6 +965,23 @@ async function renderizarConexao(dados) {
       }
     } catch (e) {}
   }
+}
+
+async function gerarNovoQR() {
+  const btn = document.getElementById("btnGerarQR");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Gerando...";
+  }
+  try {
+    const chave = localStorage.getItem(LS_CHAVE);
+    const resp = await fetch(`/api/reconectar?chave=${encodeURIComponent(chave)}`, { method: "POST" });
+    const d = await resp.json();
+    if (!resp.ok) alert(d.erro || "Não foi possível gerar o QR code agora.");
+  } catch (e) {
+    alert("Erro ao gerar QR code. Tente de novo em alguns segundos.");
+  }
+  setTimeout(atualizar, 1500);
 }
 
 const CORES = { cliques: "#1E4FA0", mensagens: "#B45309", agendamentos: "#1E9E5B" };

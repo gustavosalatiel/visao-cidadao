@@ -559,6 +559,27 @@ function iniciarServidorHTTP(getSock) {
     }
   });
 
+  app.post("/api/reconectar", async (req, res) => {
+    if (req.query.chave !== CFG.CHAVE_API) {
+      return res.status(401).json({ erro: "Chave inválida" });
+    }
+    if (statusConexao === "conectado") {
+      return res.status(400).json({ erro: "Já está conectado" });
+    }
+    try {
+      try {
+        sockAtual?.end?.(new Error("Reconectando via painel"));
+      } catch {}
+      fs.rmSync(path.join(DATA_DIR, "auth"), { recursive: true, force: true });
+      qrAtual = null;
+      statusConexao = "conectando";
+      sockAtual = await iniciarBot();
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ erro: "Falha ao reconectar" });
+    }
+  });
+
   app.get("/api/conversa", (req, res) => {
     if (req.query.chave !== CFG.CHAVE_API) {
       return res.status(401).json({ erro: "Chave inválida" });
