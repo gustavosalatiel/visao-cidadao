@@ -624,6 +624,23 @@ function iniciarServidorHTTP(getSock) {
     }
   });
 
+  app.post("/api/agendamento-manual", (req, res) => {
+    const { chave, nome, telefone, horario } = req.body || {};
+    if (chave !== CFG.CHAVE_API) {
+      return res.status(401).json({ erro: "Chave inválida" });
+    }
+    if (!nome || !nome.trim() || !horario || !horario.trim()) {
+      return res.status(400).json({ erro: "Informe nome e horário" });
+    }
+    salvarAgendamento({
+      nome: nome.trim(),
+      telefone: (telefone || "").trim(),
+      horario: horario.trim(),
+      origem: "manual",
+    });
+    res.json({ ok: true });
+  });
+
   function telefoneParaJid(telefone) {
     return telefone.endsWith("@lid")
       ? telefone

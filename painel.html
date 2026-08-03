@@ -174,7 +174,37 @@
     outline-offset: 1px;
     border-color: var(--azul2);
   }
+  select {
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    width: 100%;
+    font-family: inherit;
+    background: #fff;
+  }
   button { font-family: inherit; }
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,20,35,.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 16px;
+  }
+  .modal-box {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.25);
+  }
+  .modal-box h3 { margin: 0 0 16px; color: var(--azul); font-size: 17px; }
+  .modal-box label { display: block; font-size: 13px; font-weight: 600; color: var(--texto-fraco); margin: 12px 0 4px; }
+  .modal-box .modal-botoes { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
   .btn {
     background: linear-gradient(135deg, var(--azul2), var(--azul));
     color: #fff;
@@ -544,10 +574,27 @@
         <h2>Agenda por município</h2>
         <div style="display:flex; gap:8px; align-items:center;">
           <input type="text" id="buscaAgenda" placeholder="Buscar nome ou telefone..." />
+          <button class="btn" onclick="abrirModalAgendamento()">+ Novo agendamento</button>
           <button class="btn-fraco" id="btnExportar">Exportar CSV</button>
         </div>
       </div>
       <div class="secao-body" id="listaAgenda"></div>
+    </div>
+
+    <div id="modalAgendamento" class="modal-overlay oculto">
+      <div class="modal-box">
+        <h3>Novo agendamento manual</h3>
+        <label for="inputNomeAgendamento">Nome completo</label>
+        <input type="text" id="inputNomeAgendamento" style="max-width:none" placeholder="Nome da pessoa" />
+        <label for="inputTelefoneAgendamento">Telefone (opcional)</label>
+        <input type="text" id="inputTelefoneAgendamento" style="max-width:none" placeholder="Ex: 5569999999999" />
+        <label for="inputHorarioAgendamento">Data, cidade e horário</label>
+        <select id="inputHorarioAgendamento"></select>
+        <div class="modal-botoes">
+          <button class="btn-fraco" onclick="fecharModalAgendamento()">Cancelar</button>
+          <button class="btn" onclick="salvarAgendamentoManual()">Salvar</button>
+        </div>
+      </div>
     </div>
 
     <div id="painelCampanhas" class="secao oculto">
@@ -877,6 +924,46 @@ function renderizarAgenda() {
   }
 
   document.getElementById("listaAgenda").innerHTML = html || `<div class="vazio-msg">Nada encontrado.</div>`;
+}
+
+function abrirModalAgendamento() {
+  if (!dadosAtuais) return;
+  const select = document.getElementById("inputHorarioAgendamento");
+  select.innerHTML = dadosAtuais.horarios.map((h) => `<option value="${h}">${h}</option>`).join("");
+  document.getElementById("inputNomeAgendamento").value = "";
+  document.getElementById("inputTelefoneAgendamento").value = "";
+  document.getElementById("modalAgendamento").classList.remove("oculto");
+}
+
+function fecharModalAgendamento() {
+  document.getElementById("modalAgendamento").classList.add("oculto");
+}
+
+async function salvarAgendamentoManual() {
+  const nome = document.getElementById("inputNomeAgendamento").value.trim();
+  const telefone = document.getElementById("inputTelefoneAgendamento").value.trim();
+  const horario = document.getElementById("inputHorarioAgendamento").value;
+  if (!nome) {
+    alert("Informe o nome da pessoa.");
+    return;
+  }
+  const chave = localStorage.getItem(LS_CHAVE);
+  try {
+    const resp = await fetch("/api/agendamento-manual", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chave, nome, telefone, horario }),
+    });
+    const d = await resp.json();
+    if (!resp.ok) {
+      alert(d.erro || "Não foi possível salvar o agendamento.");
+      return;
+    }
+    fecharModalAgendamento();
+    atualizar();
+  } catch (e) {
+    alert("Erro ao salvar agendamento.");
+  }
 }
 
 async function retomarIA(telefone) {
