@@ -350,7 +350,7 @@ REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 - Se ela disser que quer TROCAR/MUDAR o horário de um agendamento que já existe, NÃO use ###AGENDAR###. Em vez disso finalize a resposta com esta marcação EXATA em uma linha separada: ###REAGENDAR###{"nome":"NOME DA PESSOA","horarioAntigo":"HORÁRIO ANTIGO EXATO (copie certinho da lista de agendamentos já feitos acima)","horarioNovo":"HORÁRIO NOVO ESCOLHIDO"} — isso substitui o agendamento antigo pelo novo, sem duplicar na agenda.
 - Quando a pessoa CONFIRMAR um horário NOVO (que não é troca de um já existente) e você já souber o nome dela, finalize sua resposta com esta marcação EXATA em uma linha separada:
 ###AGENDAR###{"nome":"NOME DA PESSOA","horario":"HORÁRIO ESCOLHIDO"}
-- Essa marcação é invisível pra pessoa (o sistema remove). Use apenas UMA vez, na hora que fechar o agendamento.
+- Essa marcação é invisível pra pessoa (o sistema remove). Use UMA marcação ###AGENDAR### pra cada pessoa que está sendo agendada — se a pessoa estiver marcando pra mais de uma (ex: ela e o filho), coloque uma marcação ###AGENDAR### separada pra cada uma, cada uma em sua própria linha, todas na mesma resposta.
 - Na mesma mensagem, confirme pra pessoa: a *data* (sempre por extenso, tipo "21 de agosto", nunca "21/08"), o *horário* e o *local* em negrito (asterisco de cada lado) + que é gratuito.
 - Se a pessoa pedir algo que você não sabe, diga que vai verificar com a equipe e que já retornam.
 - Se perguntarem sobre preços de óculos, responda, mas deixe claro que a compra nunca é obrigatória.`;
@@ -386,10 +386,9 @@ async function perguntarIA(historico, jid) {
 
 function processarResposta(textoIA, jid) {
   let texto = textoIA;
-  const marca = /###AGENDAR###\s*(\{[\s\S]*?\})/;
-  const m = texto.match(marca);
 
-  if (m) {
+  const marca = /###AGENDAR###\s*(\{[\s\S]*?\})/g;
+  for (const m of [...texto.matchAll(marca)]) {
     try {
       const dados = JSON.parse(m[1]);
       const telefone = resolverTelefone(jid);
@@ -412,14 +411,13 @@ function processarResposta(textoIA, jid) {
     } catch (e) {
       console.error("Falha ao ler agendamento da IA:", e.message);
     }
-    texto = texto.replace(marca, "").trim();
   }
+  texto = texto.replace(marca, "").trim();
 
-  const marcaReagendar = /###REAGENDAR###\s*(\{[\s\S]*?\})/;
-  const mReagendar = texto.match(marcaReagendar);
-  if (mReagendar) {
+  const marcaReagendar = /###REAGENDAR###\s*(\{[\s\S]*?\})/g;
+  for (const m of [...texto.matchAll(marcaReagendar)]) {
     try {
-      const dados = JSON.parse(mReagendar[1]);
+      const dados = JSON.parse(m[1]);
       const telefone = resolverTelefone(jid);
       const lista = carregarAgendamentos().filter(
         (a) => !(a.telefone === telefone && a.horario === dados.horarioAntigo)
@@ -436,8 +434,8 @@ function processarResposta(textoIA, jid) {
     } catch (e) {
       console.error("Falha ao reagendar:", e.message);
     }
-    texto = texto.replace(marcaReagendar, "").trim();
   }
+  texto = texto.replace(marcaReagendar, "").trim();
 
   const marcaTransferir = /###TRANSFERIR_HUMANO###/;
   if (marcaTransferir.test(texto)) {
