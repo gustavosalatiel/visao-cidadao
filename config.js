@@ -53,12 +53,7 @@ module.exports = {
     "Quinta-feira 20 de agosto no Distrito de Extrema-RO às 14:00",
     "Quinta-feira 20 de agosto no Distrito de Extrema-RO às 15:00",
     "Quinta-feira 20 de agosto no Distrito de Extrema-RO às 16:00",
-    "Sexta-feira 21 de agosto em Guajará-Mirim-RO às 08:00",
-    "Sexta-feira 21 de agosto em Guajará-Mirim-RO às 09:00",
-    "Sexta-feira 21 de agosto em Guajará-Mirim-RO às 10:00",
-    "Sexta-feira 21 de agosto em Guajará-Mirim-RO às 14:00",
     "Sexta-feira 21 de agosto em Guajará-Mirim-RO às 15:00",
-    "Sexta-feira 21 de agosto em Guajará-Mirim-RO às 16:00",
   ],
   INFORMACOES: `
 - O exame de vista é 100% GRATUITO. Não vendemos nada, não tem custo nenhum em momento algum.
