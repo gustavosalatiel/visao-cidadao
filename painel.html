@@ -1014,30 +1014,9 @@ function renderizarAgenda() {
       })
       .join("");
 
-    const foraDoPadrao = bateLista(outrosPorCidade.get(grupo.cidade) || []);
-    const porHorarioForaPadrao = new Map();
-    for (const p of foraDoPadrao) {
-      if (!porHorarioForaPadrao.has(p.horario)) porHorarioForaPadrao.set(p.horario, []);
-      porHorarioForaPadrao.get(p.horario).push(p);
-    }
-    const blocoForaPadrao = [...porHorarioForaPadrao.entries()]
-      .map(
-        ([horario, pessoas]) => `
-          <details class="horario-sub" open>
-            <summary>
-              <span>${escaparHtml(horario)}</span>
-              <span class="badge">${pessoas.length} agendado${pessoas.length === 1 ? "" : "s"}</span>
-            </summary>
-            <ul class="lista-pessoas">${pessoas.map((p) => linhaAgendamento(p, false)).join("")}</ul>
-          </details>
-        `
-      )
-      .join("");
+    if (!linhasHorario) continue;
 
-    if (!linhasHorario && !blocoForaPadrao) continue;
-
-    const totalCidade =
-      grupo.horarios.reduce((soma, h) => soma + (porHorario.get(h) || []).length, 0) + foraDoPadrao.length;
+    const totalCidade = grupo.horarios.reduce((soma, h) => soma + (porHorario.get(h) || []).length, 0);
 
     html += `
       <details class="municipio-grupo" open>
@@ -1046,7 +1025,20 @@ function renderizarAgenda() {
           <span class="badge-cidade">${totalCidade} agendado${totalCidade === 1 ? "" : "s"}</span>
         </summary>
         ${linhasHorario}
-        ${blocoForaPadrao}
+      </details>
+    `;
+  }
+
+  for (const grupo of dados.cidades) {
+    const foraDoPadrao = bateLista(outrosPorCidade.get(grupo.cidade) || []);
+    if (foraDoPadrao.length === 0) continue;
+    html += `
+      <details class="municipio-grupo" open>
+        <summary>
+          <span>⏱️ Fora do padrão — ${grupo.cidade}</span>
+          <span class="badge-cidade">${foraDoPadrao.length} agendado${foraDoPadrao.length === 1 ? "" : "s"}</span>
+        </summary>
+        <ul class="lista-pessoas">${foraDoPadrao.map((p) => linhaAgendamento(p, true)).join("")}</ul>
       </details>
     `;
   }
