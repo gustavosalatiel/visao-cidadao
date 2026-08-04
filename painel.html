@@ -943,6 +943,11 @@ async function marcarTransferido(criadoEm, transferido) {
   } catch (e) {}
 }
 
+function extrairCidadeCliente(horario) {
+  const m = (horario || "").match(/\b(?:em|no|na)\s+(.+?)\s+às\s+\d{2}:\d{2}/i);
+  return m ? m[1] : null;
+}
+
 function renderizarAgenda() {
   const dados = dadosAtuais;
   if (!dados) return;
@@ -956,11 +961,34 @@ function renderizarAgenda() {
     else outros.push(ag);
   }
 
+  const cidadesConhecidas = new Set(dados.cidades.map((g) => g.cidade));
+  const outrosPorCidade = new Map();
+  const outrosSemCidade = [];
+  for (const ag of outros) {
+    const cidade = extrairCidadeCliente(ag.horario);
+    if (cidade && cidadesConhecidas.has(cidade)) {
+      if (!outrosPorCidade.has(cidade)) outrosPorCidade.set(cidade, []);
+      outrosPorCidade.get(cidade).push(ag);
+    } else {
+      outrosSemCidade.push(ag);
+    }
+  }
+
   function bate(pessoas, horario) {
     if (!termo) return true;
     if (horario.toLowerCase().includes(termo)) return true;
     return pessoas.some(
       (p) => (p.nome || "").toLowerCase().includes(termo) || (p.telefone || "").toLowerCase().includes(termo)
+    );
+  }
+
+  function bateLista(pessoas) {
+    if (!termo) return pessoas;
+    return pessoas.filter(
+      (p) =>
+        (p.nome || "").toLowerCase().includes(termo) ||
+        (p.telefone || "").toLowerCase().includes(termo) ||
+        (p.horario || "").toLowerCase().includes(termo)
     );
   }
 
@@ -986,9 +1014,24 @@ function renderizarAgenda() {
       })
       .join("");
 
-    if (!linhasHorario) continue;
+    const foraDoPadrao = bateLista(outrosPorCidade.get(grupo.cidade) || []);
+    const blocoForaPadrao =
+      foraDoPadrao.length > 0
+        ? `
+          <details class="horario-sub" open>
+            <summary>
+              <span>Fora do padrão</span>
+              <span class="badge">${foraDoPadrao.length} agendado${foraDoPadrao.length === 1 ? "" : "s"}</span>
+            </summary>
+            <ul class="lista-pessoas">${foraDoPadrao.map((p) => linhaAgendamento(p, true)).join("")}</ul>
+          </details>
+        `
+        : "";
 
-    const totalCidade = grupo.horarios.reduce((soma, h) => soma + (porHorario.get(h) || []).length, 0);
+    if (!linhasHorario && !blocoForaPadrao) continue;
+
+    const totalCidade =
+      grupo.horarios.reduce((soma, h) => soma + (porHorario.get(h) || []).length, 0) + foraDoPadrao.length;
 
     html += `
       <details class="municipio-grupo" open>
@@ -997,15 +1040,17 @@ function renderizarAgenda() {
           <span class="badge-cidade">${totalCidade} agendado${totalCidade === 1 ? "" : "s"}</span>
         </summary>
         ${linhasHorario}
+        ${blocoForaPadrao}
       </details>
     `;
   }
 
-  if (outros.length > 0 && (!termo || outros.some((p) => (p.nome || "").toLowerCase().includes(termo) || (p.telefone || "").toLowerCase().includes(termo)))) {
+  const semCidadeFiltrado = bateLista(outrosSemCidade);
+  if (semCidadeFiltrado.length > 0) {
     html += `
       <details class="municipio-grupo" open>
-        <summary><span>Outros horários (fora da lista padrão)</span><span class="badge-cidade">${outros.length}</span></summary>
-        <ul class="lista-pessoas">${outros.map((p) => linhaAgendamento(p, true)).join("")}</ul>
+        <summary><span>Outros horários (cidade não identificada)</span><span class="badge-cidade">${semCidadeFiltrado.length}</span></summary>
+        <ul class="lista-pessoas">${semCidadeFiltrado.map((p) => linhaAgendamento(p, true)).join("")}</ul>
       </details>
     `;
   }
