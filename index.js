@@ -493,6 +493,49 @@ async function responder(sock, jid, textoRecebido) {
   ultimoEnvioAutomatico.set(jid, Date.now());
 }
 
+const LEMBRETE_INATIVIDADE_MS = 60 * 60 * 1000; // 1 hora sem resposta
+const LEMBRETE_JANELA_MAX_MS = 24 * 60 * 60 * 1000; // não manda pra quem sumiu há mais de 1 dia
+
+function jaAgendou(telefone) {
+  return carregarAgendamentos().some((a) => a.telefone === telefone);
+}
+
+async function verificarLembretesDeUrgencia() {
+  if (!sockAtual) return;
+  const agora = Date.now();
+  for (const [chave, info] of Object.entries(contatos)) {
+    if (info.lembreteEnviado) continue;
+    const jidReal = chave.endsWith("@lid") ? chave : chave + "@s.whatsapp.net";
+    if (pausados.has(jidReal) || pausados.has(chave)) continue;
+    const inativoMs = agora - new Date(info.ultimaMensagem).getTime();
+    if (inativoMs < LEMBRETE_INATIVIDADE_MS || inativoMs > LEMBRETE_JANELA_MAX_MS) continue;
+    const telefoneResolvido = chave.endsWith("@lid") ? info.numeroReal || chave : chave;
+    if (jaAgendou(telefoneResolvido)) continue;
+
+    const mensagem =
+      "Oi! 👋 Vi que você começou a conversar com a gente mas ainda não garantiu seu horário do exame de vista gratuito. " +
+      "As vagas estão acabando rápido — quer que eu já deixe reservado um horário pra você? 😊";
+
+    try {
+      const enviada = await sockAtual.sendMessage(jidReal, { text: mensagem });
+      registrarIdEnviado(enviada?.key?.id);
+      ultimoEnvioAutomatico.set(jidReal, Date.now());
+
+      let hist = historicos.get(jidReal) || [];
+      hist.push({ role: "atendente", text: mensagem });
+      if (hist.length > MAX_HISTORICO) hist = hist.slice(-MAX_HISTORICO);
+      historicos.set(jidReal, hist);
+      salvarHistoricos();
+
+      info.lembreteEnviado = true;
+      salvarContatos(contatos);
+      console.log("⏰ Lembrete de urgência enviado para:", chave);
+    } catch (e) {
+      console.error("Erro ao enviar lembrete:", e.message);
+    }
+  }
+}
+
 let geracaoAtual = 0;
 
 async function iniciarBot() {
@@ -936,6 +979,7 @@ let sockAtual = null;
   }
   sockAtual = await iniciarBot();
   iniciarServidorHTTP(() => sockAtual);
+  setInterval(verificarLembretesDeUrgencia, 5 * 60 * 1000);
 })().catch((e) => {
   console.error("Erro fatal ao iniciar o bot:", e.message);
   process.exit(1);
