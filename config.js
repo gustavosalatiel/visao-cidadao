@@ -8,6 +8,7 @@ module.exports = {
     "Boca do Acre-AM": "Clínica Spaço Profissional, no Piquiá",
     "Acrelândia-AC": "Igreja AD Brás Madureira — Rua Minas Gerais",
     "Guajará-Mirim-RO": "SINTERO — Avenida 15 de Novembro (de frente ao Hotel Quinzão)",
+    "Distrito de Extrema-RO": "Igreja Missionária IMUB — Rua Boa Esperança, Bairro Planalto",
   },
   CIDADE: "Acre, Amazonas e Rondônia (mutirão itinerante — uma cidade por dia)",
   HORARIOS: [
@@ -59,6 +60,12 @@ module.exports = {
     "Sexta-feira 21 de agosto em Guajará-Mirim-RO às 14:00",
     "Sexta-feira 21 de agosto em Guajará-Mirim-RO às 15:00",
     "Sexta-feira 21 de agosto em Guajará-Mirim-RO às 16:00",
+    "Sábado 22 de agosto em Guajará-Mirim-RO às 08:00",
+    "Sábado 22 de agosto em Guajará-Mirim-RO às 09:00",
+    "Sábado 22 de agosto em Guajará-Mirim-RO às 10:00",
+    "Sábado 22 de agosto em Guajará-Mirim-RO às 14:00",
+    "Sábado 22 de agosto em Guajará-Mirim-RO às 15:00",
+    "Sábado 22 de agosto em Guajará-Mirim-RO às 16:00",
   ],
   INFORMACOES: `
 - O exame de vista é 100% GRATUITO. Não vendemos nada, não tem custo nenhum em momento algum.
