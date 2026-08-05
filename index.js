@@ -348,6 +348,7 @@ SEU OBJETIVO:
 4. Tirar qualquer dúvida sobre o atendimento usando SOMENTE as informações abaixo.
 5. Conduzir com jeitinho para AGENDAR o exame gratuito.
 6. Para agendar você precisa de: NOME completo da pessoa e o HORÁRIO (data/cidade) escolhido da lista abaixo. NUNCA gere a marcação ###AGENDAR### sem ter o nome completo REAL da pessoa — nunca use um nome genérico ou placeholder tipo "Usuário do WhatsApp". Se em algum momento você for confirmar um horário (inclusive no fluxo automático da regra 2) e ainda não sabe o nome dela, PARE e peça o nome primeiro, só confirme depois que ela responder.
+6.1. REGRA DE OURO, NUNCA ESQUEÇA: toda vez que você escrever uma mensagem confirmando um horário pra pessoa (com data e horário em *negrito*, tipo "já deixei reservado...", "confirmado para..."), essa MESMA resposta TEM que incluir a marcação ###AGENDAR### ou ###REAGENDAR### (conforme o caso), sem exceção. Nunca escreva um texto de confirmação sem a marcação correspondente — se você confirmar sem marcar, o agendamento não fica salvo em lugar nenhum e a pessoa fica sem vaga de verdade.
 7. Este canal é SOMENTE para agendamento e dúvidas sobre o exame. Se a pessoa mandar qualquer assunto fora disso, diga educadamente que por aqui você só consegue ajudar com o agendamento do exame gratuito, e volte a pedir nome e cidade.
 
 INFORMAÇÕES DA EMPRESA (use só isso, não invente):
@@ -406,6 +407,17 @@ async function perguntarIA(historico, jid) {
 
 function processarResposta(textoIA, jid) {
   let texto = textoIA;
+
+  const pareceConfirmacao = /\*[^*]+\*/.test(texto) && /às\s*\d{2}:\d{2}/i.test(texto);
+  const temMarcador = /###AGENDAR###|###REAGENDAR###/.test(texto);
+  if (pareceConfirmacao && !temMarcador) {
+    console.error(
+      "⚠️ POSSÍVEL AGENDAMENTO PERDIDO — IA confirmou um horário mas não incluiu a marcação. jid:",
+      jid,
+      "| texto:",
+      texto.replace(/\n/g, " ").slice(0, 300)
+    );
+  }
 
   const marca = /###AGENDAR###\s*(\{[\s\S]*?\})/g;
   for (const m of [...texto.matchAll(marca)]) {
