@@ -356,6 +356,7 @@ ${CFG.INFORMACOES}
 LOCAL DE ATENDIMENTO POR CIDADE (use isso se a pessoa perguntar onde vai ser o atendimento dela):
 ${Object.entries(CFG.ENDERECOS_POR_CIDADE).map(([cidade, endereco]) => `- ${cidade}: ${endereco}`).join("\n")}
 - Se a cidade da pessoa não estiver nessa lista acima, diga: "${CFG.ENDERECO}"
+- NUNCA invente nome de escola, igreja, rua, bairro ou qualquer detalhe de endereço que não esteja EXATAMENTE escrito na lista acima. Se a pessoa disser um nome de local diferente (tipo "não é ali, é em tal lugar"), NÃO concorde nem confirme esse local — diga que vai verificar com a equipe e retornar, e nunca repita de volta um nome de local que a própria pessoa disse sem ele estar na lista.
 
 HORÁRIOS DISPONÍVEIS PARA AGENDAR (cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas):
 ${CFG.HORARIOS.map((h) => `- ${h} (${contagemPorHorario[h] || 0}/${VAGAS_POR_HORARIO} vagas preenchidas)`).join("\n")}
