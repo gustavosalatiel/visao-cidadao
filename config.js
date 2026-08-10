@@ -9,7 +9,7 @@ module.exports = {
     "Acrelândia-AC": "Igreja AD Brás Madureira — Rua Minas Gerais",
     "Guajará-Mirim-RO": "SINTERO — Avenida 15 de Novembro (de frente ao Hotel Quinzão)",
     "Distrito de Extrema-RO": "Igreja Missionária IMUB — Rua Boa Esperança, Bairro Planalto",
-    "Moraes de Almeida-PA": "Escola César Almeida",
+    "Moraes de Almeida-PA": "Escola César Almeida — Distrito de Moraes Almeida, s/n, Rodovia BR-163, km 1.185, Itaituba-PA",
   },
   CIDADE: "Acre, Amazonas, Rondônia e Pará (mutirão itinerante — uma cidade por dia)",
   HORARIOS: [
