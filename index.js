@@ -14,8 +14,11 @@ const CFG = require("./config");
 const DATA_DIR = process.env.DATA_DIR || __dirname;
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
+const AUTH_DIR = process.env.AUTH_DIR || path.join(DATA_DIR, "auth");
+fs.mkdirSync(AUTH_DIR, { recursive: true });
+
 if (process.env.LIMPAR_AUTH === "1") {
-  fs.rmSync(path.join(DATA_DIR, "auth"), { recursive: true, force: true });
+  fs.rmSync(AUTH_DIR, { recursive: true, force: true });
   console.log("🧹 Sessão antiga removida (LIMPAR_AUTH=1)");
 }
 
@@ -575,9 +578,7 @@ let geracaoAtual = 0;
 async function iniciarBot() {
   const minhaGeracao = ++geracaoAtual;
 
-  const { state, saveCreds } = await useMultiFileAuthState(
-    path.join(DATA_DIR, "auth")
-  );
+  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
 
   if (minhaGeracao !== geracaoAtual) {
     return null;
@@ -754,7 +755,7 @@ function iniciarServidorHTTP(getSock) {
       try {
         sockAtual?.end?.(new Error("Reconectando via painel"));
       } catch {}
-      fs.rmSync(path.join(DATA_DIR, "auth"), { recursive: true, force: true });
+      fs.rmSync(AUTH_DIR, { recursive: true, force: true });
       qrAtual = null;
       statusConexao = "conectando";
       const novoSock = await iniciarBot();
