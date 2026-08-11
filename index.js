@@ -342,6 +342,7 @@ SUA PERSONALIDADE:
 SEU OBJETIVO:
 0. IMPORTANTE — MEMÓRIA: o histórico de mensagens abaixo é permanente, mesmo que a última conversa tenha sido há dias ou semanas. Se o nome da pessoa já aparece em mensagens anteriores no histórico, você JÁ CONHECE essa pessoa — chame ela pelo nome desde a primeira resposta e NÃO peça nome/cidade de novo (só pergunte de novo se for pra um NOVO agendamento e o horário anterior já passou). Trate isso como se você realmente lembrasse da pessoa.
 1. Se for a primeira conversa (nome não aparece no histórico), seja direta desde a primeira mensagem: dê boas-vindas e já peça o nome completo e a cidade da pessoa para reservar o exame gratuito. Não pergunte como a pessoa está se sentindo nem faça perguntas exploratórias. Exemplo de abertura: "Oi! Aqui é do projeto Visão Cidadão 😊 para realizar seu agendamento para consultas e exames gratuitos me envie seu nome completo e qual sua cidade, que eu já deixo seu exame gratuito reservado!"
+1.1. ATENÇÃO — RESPOSTA PARCIAL: se você pediu "nome e cidade" junto e a pessoa só respondeu UMA das duas coisas (por exemplo só disse a cidade, ou só o nome), NÃO prossiga como se tivesse as duas. Pergunte especificamente pela informação que ainda falta (ex: "Show, e qual é o seu nome completo?") antes de continuar. Só avance no agendamento quando tiver as duas coisas confirmadas de verdade.
 2. Assim que souber a cidade da pessoa, veja se ela tem horários na lista HORÁRIOS DISPONÍVEIS PARA AGENDAR abaixo. Se tiver, pergunte SÓ o período, sem listar horários: "Consigo te encaixar sexta-feira, dia 21 de agosto, em Guajará-Mirim! Prefere de manhã ou de tarde?" Assim que ela responder o período (ou já disser um horário específico), é VOCÊ quem escolhe o horário exato — pegue o primeiro horário daquele período/dia/cidade que ainda não esteja em ${VAGAS_POR_HORARIO}/${VAGAS_POR_HORARIO} vagas (ordem da manhã: 08:00, 09:00, 10:00 — ordem da tarde: 14:00, 15:00, 16:00) e JÁ CONFIRME o agendamento nesse horário na mesma mensagem, usando a marcação ###AGENDAR### (regras completas mais abaixo). NÃO pergunte qual horário ela prefere dentro do período nem liste as opções — você decide sozinha e confirma direto, sem dar várias opções pra pessoa escolher. Se a cidade dela NÃO tiver nenhum horário na lista, responda nesse estilo: "Nessa cidade não temos atendimento no momento, mas nas seguintes cidades sim: [liste as cidades que estão na lista de horários]. Alguma dessas você conseguiria se deslocar pra fazer o seu atendimento, ou alguma fica próxima de você?" Nunca invente data, horário ou cidade que não esteja na lista.
 2.1. CASO ESPECIAL — OURO PRETO DO OESTE: se a pessoa perguntar sobre atendimento em Ouro Preto do Oeste, responda algo como "Em Ouro Preto do Oeste vamos atender no dia 22 de agosto (sábado), na Clínica Ouro Preto Particular! Vou te passar agora pra uma das nossas atendentes continuar seu atendimento, só um instante 😊" e finalize a resposta com esta marcação EXATA em uma linha separada: ###TRANSFERIR_HUMANO### (essa marcação é invisível pra pessoa, o sistema remove).
 2.1.1. CASO ESPECIAL — GUAJARÁ-MIRIM-RO: pra pessoas NOVAS que ainda não têm agendamento em Guajará-Mirim, ofereça SOMENTE datas do dia 22 de agosto (sábado) — o dia 21 de agosto já está com a agenda cheia e não deve ser oferecido pra ninguém novo, mesmo que algum horário do dia 21 apareça na lista com vaga sobrando. Trate o dia 22 normalmente como qualquer outro dia da lista (pergunte manhã ou tarde, escolha o horário, confirme).
@@ -409,6 +410,14 @@ async function perguntarIA(historico, jid) {
   return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
+function nomeValido(nome) {
+  if (!nome || typeof nome !== "string") return false;
+  const limpo = nome.trim();
+  if (limpo.length < 3) return false;
+  if (/usu[aá]rio|whatsapp|n[ãa]o informado|desconhecid[oa]/i.test(limpo)) return false;
+  return true;
+}
+
 function processarResposta(textoIA, jid) {
   let texto = textoIA;
 
@@ -437,7 +446,16 @@ function processarResposta(textoIA, jid) {
           a.nome === dados.nome &&
           Date.now() - new Date(a.criadoEm).getTime() < JANELA_DUPLICADO_MS
       );
-      if (!jaExiste) {
+      if (!nomeValido(dados.nome)) {
+        console.error(
+          "⚠️ Agendamento BLOQUEADO — nome inválido/placeholder:",
+          JSON.stringify(dados.nome),
+          "| jid:",
+          jid,
+          "| horario:",
+          horario
+        );
+      } else if (!jaExiste) {
         salvarAgendamento({
           nome: dados.nome,
           horario,
@@ -857,6 +875,18 @@ function iniciarServidorHTTP(getSock) {
     const havia = pausados.delete(jid);
     if (havia) salvarPausados(pausados);
     res.json({ ok: true, retomado: havia });
+  });
+
+  app.post("/api/retomar-todos", (req, res) => {
+    const { chave } = req.body || {};
+    if (chave !== CFG.CHAVE_API) {
+      return res.status(401).json({ erro: "Chave inválida" });
+    }
+    const quantidade = pausados.size;
+    pausados.clear();
+    salvarPausados(pausados);
+    console.log(`▶️  IA retomada para todas as ${quantidade} conversas pausadas`);
+    res.json({ ok: true, retomados: quantidade });
   });
 
   app.post("/api/pausar", (req, res) => {
