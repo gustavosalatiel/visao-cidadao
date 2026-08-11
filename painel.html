@@ -948,9 +948,22 @@ function extrairCidadeCliente(horario) {
   return m ? m[1] : null;
 }
 
+const estadoDetalhesAgenda = new Map();
+
+function capturarEstadoAgenda() {
+  document.querySelectorAll("#listaAgenda details[data-key]").forEach((el) => {
+    estadoDetalhesAgenda.set(el.dataset.key, el.open);
+  });
+}
+
+function estaAberto(key, padrao) {
+  return estadoDetalhesAgenda.has(key) ? estadoDetalhesAgenda.get(key) : padrao;
+}
+
 function renderizarAgenda() {
   const dados = dadosAtuais;
   if (!dados) return;
+  capturarEstadoAgenda();
   const termo = document.getElementById("buscaAgenda").value.trim().toLowerCase();
 
   const porHorario = new Map();
@@ -998,8 +1011,9 @@ function renderizarAgenda() {
       .filter((h) => bate(porHorario.get(h) || [], h))
       .map((h) => {
         const pessoas = porHorario.get(h) || [];
+        const chaveHorario = `horario:${h}`;
         return `
-          <details class="horario-sub" ${pessoas.length > 0 ? "open" : ""}>
+          <details class="horario-sub" data-key="${chaveHorario}" ${estaAberto(chaveHorario, pessoas.length > 0) ? "open" : ""}>
             <summary>
               <span>${h}</span>
               <span class="badge ${pessoas.length === 0 ? "zero" : ""}">${pessoas.length} agendado${pessoas.length === 1 ? "" : "s"}</span>
@@ -1018,8 +1032,9 @@ function renderizarAgenda() {
 
     const totalCidade = grupo.horarios.reduce((soma, h) => soma + (porHorario.get(h) || []).length, 0);
 
+    const chaveCidade = `cidade:${grupo.cidade}`;
     html += `
-      <details class="municipio-grupo" open>
+      <details class="municipio-grupo" data-key="${chaveCidade}" ${estaAberto(chaveCidade, true) ? "open" : ""}>
         <summary>
           <span>📍 ${grupo.cidade}</span>
           <span class="badge-cidade">${totalCidade} agendado${totalCidade === 1 ? "" : "s"}</span>
@@ -1032,8 +1047,9 @@ function renderizarAgenda() {
   for (const grupo of dados.cidades) {
     const foraDoPadrao = bateLista(outrosPorCidade.get(grupo.cidade) || []);
     if (foraDoPadrao.length === 0) continue;
+    const chaveFora = `fora:${grupo.cidade}`;
     html += `
-      <details class="municipio-grupo" open>
+      <details class="municipio-grupo" data-key="${chaveFora}" ${estaAberto(chaveFora, true) ? "open" : ""}>
         <summary>
           <span>⏱️ Fora do padrão — ${grupo.cidade}</span>
           <span class="badge-cidade">${foraDoPadrao.length} agendado${foraDoPadrao.length === 1 ? "" : "s"}</span>
@@ -1046,7 +1062,7 @@ function renderizarAgenda() {
   const semCidadeFiltrado = bateLista(outrosSemCidade);
   if (semCidadeFiltrado.length > 0) {
     html += `
-      <details class="municipio-grupo" open>
+      <details class="municipio-grupo" data-key="sem-cidade" ${estaAberto("sem-cidade", true) ? "open" : ""}>
         <summary><span>Outros horários (cidade não identificada)</span><span class="badge-cidade">${semCidadeFiltrado.length}</span></summary>
         <ul class="lista-pessoas">${semCidadeFiltrado.map((p) => linhaAgendamento(p, true)).join("")}</ul>
       </details>
