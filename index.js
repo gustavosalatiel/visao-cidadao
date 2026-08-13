@@ -104,6 +104,43 @@ function normalizarHorario(horarioBruto) {
   return correspondente || texto;
 }
 
+const MESES_PT = {
+  janeiro: 0,
+  fevereiro: 1,
+  março: 2,
+  abril: 3,
+  maio: 4,
+  junho: 5,
+  julho: 6,
+  agosto: 7,
+  setembro: 8,
+  outubro: 9,
+  novembro: 10,
+  dezembro: 11,
+};
+
+function hojeNoAcre() {
+  const agora = new Date();
+  const acre = new Date(agora.getTime() - 5 * 60 * 60 * 1000); // Acre = UTC-5
+  return new Date(Date.UTC(acre.getUTCFullYear(), acre.getUTCMonth(), acre.getUTCDate()));
+}
+
+function dataDoHorario(horario) {
+  const m = horario.match(/(\d{1,2})\s+de\s+([a-zçã]+)/i);
+  if (!m) return null;
+  const dia = parseInt(m[1], 10);
+  const mes = MESES_PT[m[2].toLowerCase()];
+  if (mes === undefined) return null;
+  const ano = hojeNoAcre().getUTCFullYear();
+  return new Date(Date.UTC(ano, mes, dia));
+}
+
+function horarioJaPassouOuEhHoje(horario) {
+  const data = dataDoHorario(horario);
+  if (!data) return false;
+  return data <= hojeNoAcre();
+}
+
 function agruparHorariosPorCidade(horarios) {
   const mapa = new Map();
   for (const h of horarios) {
@@ -328,6 +365,7 @@ function promptSistema(jid) {
   for (const a of todosAgendamentos) {
     contagemPorHorario[a.horario] = (contagemPorHorario[a.horario] || 0) + 1;
   }
+  const horariosAtivos = CFG.HORARIOS.filter((h) => !horarioJaPassouOuEhHoje(h));
 
   return `Você é o atendimento oficial do ${CFG.NOME_EMPRESA}, em ${CFG.CIDADE}.
 Você atende pelo WhatsApp pessoas que clicaram em um anúncio de EXAME DE VISTA GRATUITO.
@@ -347,7 +385,6 @@ SEU OBJETIVO:
 2.1. CASO ESPECIAL — OURO PRETO DO OESTE: se a pessoa perguntar sobre atendimento em Ouro Preto do Oeste, responda algo como "Em Ouro Preto do Oeste vamos atender no dia 22 de agosto (sábado), na Clínica Ouro Preto Particular! Vou te passar agora pra uma das nossas atendentes continuar seu atendimento, só um instante 😊" e finalize a resposta com esta marcação EXATA em uma linha separada: ###TRANSFERIR_HUMANO### (essa marcação é invisível pra pessoa, o sistema remove).
 2.1.1. CASO ESPECIAL — GUAJARÁ-MIRIM-RO: pra pessoas NOVAS que ainda não têm agendamento em Guajará-Mirim, ofereça SOMENTE datas do dia 22 de agosto (sábado) — o dia 21 de agosto já está com a agenda cheia e não deve ser oferecido pra ninguém novo, mesmo que algum horário do dia 21 apareça na lista com vaga sobrando. Nesse dia 22, priorize SEMPRE a tarde primeiro (não pergunte "manhã ou tarde" — já ofereça direto um horário da tarde: 14:00, 15:00 ou 16:00). Só ofereça horário de manhã (08:00, 09:00 ou 10:00) se a pessoa disser que não consegue à tarde, porque a manhã já está com bastante gente.
 2.1.2. CASO ESPECIAL — ITAITUBA/MORAES DE ALMEIDA: Moraes de Almeida é um distrito de Itaituba-PA. Se a pessoa disser que é de Itaituba (ou da região), NÃO diga que não tem atendimento lá — trate como a mesma cidade "Moraes de Almeida-PA" da lista e ofereça os horários normalmente.
-2.1.3. CASO ESPECIAL — SENA MADUREIRA-AC: o dia 13 de agosto já é HOJE (quinta-feira) — NÃO ofereça mais o dia 13 pra pessoas NOVAS, é tarde demais pra quem ainda não agendou. Ofereça SOMENTE o dia 14 de agosto (sexta-feira) pra pessoas novas, mesmo que algum horário do dia 13 apareça na lista com vaga sobrando.
 2.2. LIMITE DE VAGAS: cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas. Se TODOS os horários redondos daquele período (manhã: 08:00, 09:00, 10:00 / tarde: 14:00, 15:00, 16:00) já estiverem em ${VAGAS_POR_HORARIO}/${VAGAS_POR_HORARIO}, escolha sozinha um horário fora dos redondos mas dentro da mesma janela (manhã entre 08:00 e 12:00, tarde entre 14:00 e 18:00) que ainda não esteja cheio, e confirme nele do mesmo jeito — sem perguntar, você decide.
 3. Se, DEPOIS de você já ter confirmado um horário, a pessoa disser que esse horário não vai dar mais pra ela, aí sim pergunte "certo, qual horário fica melhor pra você?" oferecendo a janela ampla daquele período pra ela escolher (manhã: entre 08:00 e 12:00 / tarde: entre 14:00 e 18:00). Quando ela escolher, use a marcação ###REAGENDAR### pra trocar o horário anterior por esse novo, como descrito nas REGRAS DO AGENDAMENTO abaixo.
 3.1. NUNCA descarte ou desanime a pessoa por causa de horário. Sempre que for usar um horário fora dos horários redondos da lista (seja porque os redondos encheram, seja porque a pessoa pediu um horário específico depois de recusar o primeiro), a marcação ###AGENDAR### ou ###REAGENDAR### tem que usar EXATAMENTE o texto de um horário daquele mesmo dia/cidade que já está na lista HORÁRIOS DISPONÍVEIS, só trocando a parte final "às HH:MM" — nunca mude a data, o ano, a cidade nem a ordem das palavras, e nunca invente um ano diferente do que está na lista (a lista não tem ano, então você também não escreve ano nenhum).
@@ -365,8 +402,8 @@ ${Object.entries(CFG.ENDERECOS_POR_CIDADE).map(([cidade, endereco]) => `- ${cida
 - Se a cidade da pessoa não estiver nessa lista acima, diga: "${CFG.ENDERECO}"
 - NUNCA invente nome de escola, igreja, rua, bairro ou qualquer detalhe de endereço que não esteja EXATAMENTE escrito na lista acima. Se a pessoa disser um nome de local diferente (tipo "não é ali, é em tal lugar"), NÃO concorde nem confirme esse local — diga que vai verificar com a equipe e retornar, e nunca repita de volta um nome de local que a própria pessoa disse sem ele estar na lista.
 
-HORÁRIOS DISPONÍVEIS PARA AGENDAR (cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas):
-${CFG.HORARIOS.map((h) => `- ${h} (${contagemPorHorario[h] || 0}/${VAGAS_POR_HORARIO} vagas preenchidas)`).join("\n")}
+HORÁRIOS DISPONÍVEIS PARA AGENDAR (só datas futuras — o que já passou ou é hoje já foi removido daqui automaticamente; cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas):
+${horariosAtivos.length ? horariosAtivos.map((h) => `- ${h} (${contagemPorHorario[h] || 0}/${VAGAS_POR_HORARIO} vagas preenchidas)`).join("\n") : "Nenhum horário disponível no momento — todas as datas já passaram."}
 
 AGENDAMENTOS JÁ FEITOS POR ESSE CONTATO (mesmo número de WhatsApp):
 ${agendamentosContato.length ? agendamentosContato.map((a) => `- ${a.nome}: ${a.horario}`).join("\n") : "Nenhum agendamento anterior encontrado pra esse contato."}
