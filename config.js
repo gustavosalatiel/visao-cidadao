@@ -10,6 +10,7 @@ module.exports = {
     "Guajará-Mirim-RO": "SINTERO — Avenida 15 de Novembro (de frente ao Hotel Quinzão)",
     "Distrito de Extrema-RO": "Igreja Missionária IMUB — Rua Boa Esperança, Bairro Planalto",
     "Moraes de Almeida-PA": "Escola César Almeida — Distrito de Moraes Almeida, s/n, Rodovia BR-163, km 1.185, Itaituba-PA",
+    "Divinópolis-PA": "PID Ponto de Inclusão Digital — Vila de Divinópolis, no Km 70",
   },
   CIDADE: "Acre, Amazonas, Rondônia e Pará (mutirão itinerante — uma cidade por dia)",
   HORARIOS: [
@@ -91,6 +92,18 @@ module.exports = {
     "Quinta-feira 17 de setembro em Moraes de Almeida-PA às 14:00",
     "Quinta-feira 17 de setembro em Moraes de Almeida-PA às 15:00",
     "Quinta-feira 17 de setembro em Moraes de Almeida-PA às 16:00",
+    "Terça-feira 22 de setembro em Divinópolis-PA às 08:00",
+    "Terça-feira 22 de setembro em Divinópolis-PA às 09:00",
+    "Terça-feira 22 de setembro em Divinópolis-PA às 10:00",
+    "Terça-feira 22 de setembro em Divinópolis-PA às 14:00",
+    "Terça-feira 22 de setembro em Divinópolis-PA às 15:00",
+    "Terça-feira 22 de setembro em Divinópolis-PA às 16:00",
+    "Quarta-feira 23 de setembro em Divinópolis-PA às 08:00",
+    "Quarta-feira 23 de setembro em Divinópolis-PA às 09:00",
+    "Quarta-feira 23 de setembro em Divinópolis-PA às 10:00",
+    "Quarta-feira 23 de setembro em Divinópolis-PA às 14:00",
+    "Quarta-feira 23 de setembro em Divinópolis-PA às 15:00",
+    "Quarta-feira 23 de setembro em Divinópolis-PA às 16:00",
   ],
   INFORMACOES: `
 - O exame de vista é 100% GRATUITO. Não vendemos nada, não tem custo nenhum em momento algum.
