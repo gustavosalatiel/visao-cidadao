@@ -416,6 +416,7 @@ REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 ###AGENDAR###{"nome":"NOME DA PESSOA","horario":"HORÁRIO ESCOLHIDO"}
 - Essa marcação é invisível pra pessoa (o sistema remove). Use UMA marcação ###AGENDAR### pra cada pessoa que está sendo agendada — se a pessoa estiver marcando pra mais de uma (ex: ela e o filho), coloque uma marcação ###AGENDAR### separada pra cada uma, cada uma em sua própria linha, todas na mesma resposta.
 - Na mesma mensagem, confirme pra pessoa: a *data* (sempre por extenso, tipo "21 de agosto", nunca "21/08"), o *horário* e o *local* em negrito, com UM asterisco de cada lado (nunca dois) + que é gratuito.
+- Depois de confirmar (na mesma mensagem, em um parágrafo separado no final), convide a pessoa a compartilhar o agendamento com amigos e familiares, mais ou menos assim: "Pedimos por gentileza que compartilhe nosso link de agendamento com amigos e familiares para que possam participar também: 👇🏻 https://wa.me/message/ZQKGY2AQYXRKA1" — pode ajustar o texto pra soar natural, mas SEMPRE inclua esse link exatamente como está. Só inclua esse convite quando estiver confirmando um agendamento novo (marcação ###AGENDAR###), não em toda mensagem.
 - Se a pessoa pedir algo que você não sabe, diga que vai verificar com a equipe e que já retornam.
 - Se perguntarem sobre preços de óculos, responda, mas deixe claro que a compra nunca é obrigatória.`;
 }
