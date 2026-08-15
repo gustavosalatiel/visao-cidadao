@@ -702,6 +702,21 @@ function escaparHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+function apenasDigitos(s) {
+  return String(s ?? "").replace(/\D/g, "");
+}
+
+function telefoneBate(termo, ...valores) {
+  const termoBaixo = termo.toLowerCase();
+  const termoDigitos = apenasDigitos(termo);
+  return valores.some((v) => {
+    const texto = String(v ?? "");
+    if (texto.toLowerCase().includes(termoBaixo)) return true;
+    if (termoDigitos && apenasDigitos(texto).includes(termoDigitos)) return true;
+    return false;
+  });
+}
+
 const LS_CHAVE = "visao_cidadao_chave";
 let dadosAtuais = null;
 let abaAtiva = "conversas";
@@ -819,11 +834,11 @@ const threadsAbertas = new Set();
 function renderizarConversas() {
   const dados = dadosAtuais;
   if (!dados) return;
-  const termo = document.getElementById("buscaConversas").value.trim().toLowerCase();
+  const termo = document.getElementById("buscaConversas").value.trim();
 
   const lista = dados.conversas.filter((c) => {
     if (!termo) return true;
-    return c.telefone.toLowerCase().includes(termo) || (c.numeroReal || "").toLowerCase().includes(termo);
+    return telefoneBate(termo, c.telefone, c.numeroReal);
   });
 
   if (lista.length === 0) {
@@ -967,7 +982,7 @@ function renderizarAgenda() {
   const dados = dadosAtuais;
   if (!dados) return;
   capturarEstadoAgenda();
-  const termo = document.getElementById("buscaAgenda").value.trim().toLowerCase();
+  const termo = document.getElementById("buscaAgenda").value.trim();
 
   const porHorario = new Map();
   for (const h of dados.horarios) porHorario.set(h, []);
@@ -992,20 +1007,13 @@ function renderizarAgenda() {
 
   function bate(pessoas, horario) {
     if (!termo) return true;
-    if (horario.toLowerCase().includes(termo)) return true;
-    return pessoas.some(
-      (p) => (p.nome || "").toLowerCase().includes(termo) || (p.telefone || "").toLowerCase().includes(termo)
-    );
+    if (telefoneBate(termo, horario)) return true;
+    return pessoas.some((p) => telefoneBate(termo, p.nome, p.telefone));
   }
 
   function bateLista(pessoas) {
     if (!termo) return pessoas;
-    return pessoas.filter(
-      (p) =>
-        (p.nome || "").toLowerCase().includes(termo) ||
-        (p.telefone || "").toLowerCase().includes(termo) ||
-        (p.horario || "").toLowerCase().includes(termo)
-    );
+    return pessoas.filter((p) => telefoneBate(termo, p.nome, p.telefone, p.horario));
   }
 
   let html = "";
