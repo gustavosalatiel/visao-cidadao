@@ -355,12 +355,23 @@ function resolverTelefone(jid) {
   return jid.endsWith("@lid") ? contatos[jid]?.numeroReal || jid : jid.replace("@s.whatsapp.net", "");
 }
 
+function apenasDigitos(s) {
+  return (s || "").replace(/\D/g, "");
+}
+
+function telefonesEquivalentes(a, b) {
+  const da = apenasDigitos(a);
+  const db = apenasDigitos(b);
+  if (!da || !db) return false;
+  return da === db || da.endsWith(db) || db.endsWith(da);
+}
+
 const VAGAS_POR_HORARIO = 20;
 
 function promptSistema(jid) {
   const telefone = resolverTelefone(jid);
   const todosAgendamentos = carregarAgendamentos();
-  const agendamentosContato = todosAgendamentos.filter((a) => a.telefone === telefone);
+  const agendamentosContato = todosAgendamentos.filter((a) => telefonesEquivalentes(a.telefone, telefone));
   const contagemPorHorario = {};
   for (const a of todosAgendamentos) {
     contagemPorHorario[a.horario] = (contagemPorHorario[a.horario] || 0) + 1;
@@ -490,7 +501,7 @@ function processarResposta(textoIA, jid) {
       const JANELA_DUPLICADO_MS = 24 * 60 * 60 * 1000;
       const jaExiste = carregarAgendamentos().some(
         (a) =>
-          a.telefone === telefone &&
+          telefonesEquivalentes(a.telefone, telefone) &&
           a.horario === horario &&
           a.nome === dados.nome &&
           Date.now() - new Date(a.criadoEm).getTime() < JANELA_DUPLICADO_MS
@@ -545,7 +556,7 @@ function processarResposta(textoIA, jid) {
         );
       } else {
         const lista = carregarAgendamentos().filter(
-          (a) => !(a.telefone === telefone && a.horario === horarioAntigo)
+          (a) => !(telefonesEquivalentes(a.telefone, telefone) && a.horario === horarioAntigo)
         );
         lista.push({
           nome: dados.nome,
@@ -622,7 +633,7 @@ const LEMBRETE_INATIVIDADE_MS = 60 * 60 * 1000; // 1 hora sem resposta
 const LEMBRETE_JANELA_MAX_MS = 24 * 60 * 60 * 1000; // não manda pra quem sumiu há mais de 1 dia
 
 function jaAgendou(telefone) {
-  return carregarAgendamentos().some((a) => a.telefone === telefone);
+  return carregarAgendamentos().some((a) => telefonesEquivalentes(a.telefone, telefone));
 }
 
 async function verificarLembretesDeUrgencia() {

@@ -6,7 +6,7 @@ module.exports = {
     "Sena Madureira-AC": "Comunidade Batista Vida — Rua Padre Egídio, 856, Centro",
     "Xapuri-AC": "Igreja AD Brás Madureira — Rua Cel. Brandão, 1805, Bairro Cerâmica",
     "Boca do Acre-AM": "Clínica Spaço Profissional, no Piquiá",
-    "Acrelândia-AC": "Igreja AD Brás Madureira — Rua Minas Gerais",
+    "Acrelândia-AC": "Igreja Assembleia de Deus Brás Madureira — Rua Minas Gerais",
     "Guajará-Mirim-RO": "SINTERO — Avenida 15 de Novembro (de frente ao Hotel Quinzão)",
     "Distrito de Extrema-RO": "Igreja Missionária IMUB — Rua Boa Esperança, Bairro Planalto",
     "Moraes de Almeida-PA": "Escola César Almeida — Distrito de Moraes Almeida, s/n, Rodovia BR-163, km 1.185, Itaituba-PA",
