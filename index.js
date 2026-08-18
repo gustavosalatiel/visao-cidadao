@@ -135,10 +135,10 @@ function dataDoHorario(horario) {
   return new Date(Date.UTC(ano, mes, dia));
 }
 
-function horarioJaPassouOuEhHoje(horario) {
+function horarioJaPassou(horario) {
   const data = dataDoHorario(horario);
   if (!data) return false;
-  return data <= hojeNoAcre();
+  return data < hojeNoAcre();
 }
 
 function agruparHorariosPorCidade(horarios) {
@@ -376,7 +376,7 @@ function promptSistema(jid) {
   for (const a of todosAgendamentos) {
     contagemPorHorario[a.horario] = (contagemPorHorario[a.horario] || 0) + 1;
   }
-  const horariosAtivos = CFG.HORARIOS.filter((h) => !horarioJaPassouOuEhHoje(h));
+  const horariosAtivos = CFG.HORARIOS.filter((h) => !horarioJaPassou(h));
 
   return `Você é o atendimento oficial do ${CFG.NOME_EMPRESA}, em ${CFG.CIDADE}.
 Você atende pelo WhatsApp pessoas que clicaram em um anúncio de EXAME DE VISTA GRATUITO.
@@ -418,6 +418,7 @@ ${horariosAtivos.length ? horariosAtivos.map((h) => `- ${h} (${contagemPorHorari
 
 AGENDAMENTOS JÁ FEITOS POR ESSE CONTATO (mesmo número de WhatsApp):
 ${agendamentosContato.length ? agendamentosContato.map((a) => `- ${a.nome}: ${a.horario}`).join("\n") : "Nenhum agendamento anterior encontrado pra esse contato."}
+- IMPORTANTE: um agendamento que já está nessa lista é SEMPRE válido, mesmo que a data dele não apareça mais na lista HORÁRIOS DISPONÍVEIS PARA AGENDAR (a lista de disponíveis é só pra gente NOVA, não afeta quem já confirmou). NUNCA diga pra uma pessoa que já tem um agendamento nessa lista que "não vai ter atendimento" ou que a cidade dela "não tem mais data" — o agendamento dela continua de pé normalmente, só reforce a confirmação se ela perguntar.
 
 REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 - ANTES de confirmar um agendamento, olhe a lista AGENDAMENTOS JÁ FEITOS POR ESSE CONTATO acima. Se o NOME que a pessoa está agendando agora JÁ aparece nessa lista, NÃO agende de novo direto — pergunte primeiro algo como: "Vi que [nome] já tem um agendamento marcado pra [horário anterior]. Quer agendar mais um horário (por exemplo pra outra pessoa da família), ou prefere mudar esse agendamento pra um horário novo?" Só prossiga depois que ela responder essa pergunta.
@@ -476,7 +477,7 @@ function horarioValido(horario) {
   const semHora = texto.replace(/às\s*\d{2}:\d{2}/i, "").trim();
   const baseReal = CFG.HORARIOS.some((h) => h.replace(/às\s*\d{2}:\d{2}/i, "").trim() === semHora);
   if (!baseReal) return false;
-  if (horarioJaPassouOuEhHoje(texto)) return false;
+  if (horarioJaPassou(texto)) return false;
   return true;
 }
 
