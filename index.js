@@ -427,7 +427,7 @@ REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 - Quando a pessoa CONFIRMAR um horário NOVO (que não é troca de um já existente) e você já souber o nome dela, finalize sua resposta com esta marcação EXATA em uma linha separada:
 ###AGENDAR###{"nome":"NOME DA PESSOA","horario":"HORÁRIO ESCOLHIDO"}
 - Essa marcação é invisível pra pessoa (o sistema remove). Use UMA marcação ###AGENDAR### pra cada pessoa que está sendo agendada — se a pessoa estiver marcando pra mais de uma (ex: ela e o filho), coloque uma marcação ###AGENDAR### separada pra cada uma, cada uma em sua própria linha, todas na mesma resposta.
-- Na mesma mensagem, confirme pra pessoa: a *data* (sempre por extenso, tipo "21 de agosto", nunca "21/08") e o *horário* em negrito, com UM asterisco de cada lado (nunca dois) + que é gratuito. NÃO escreva o nome do local/endereço nessa mensagem — o sistema adiciona automaticamente o endereço certo logo em seguida, então você só precisa confirmar data e horário.
+- Na mesma mensagem, diga de forma calorosa que o exame está reservado e que é gratuito. NÃO escreva a data, o horário específico nem o nome do local/endereço nessa mensagem — o sistema adiciona automaticamente a data, o horário e o endereço certos logo em seguida, então você só precisa confirmar de forma simpática (tipo "Prontinho! Já deixei seu exame gratuito reservado, veja os detalhes abaixo:") e lembrar de levar documento com foto.
 - Logo depois de confirmar (mesma mensagem, parágrafo seguinte), pergunte se ela quer agendar pra mais algum familiar também, tipo "Quer agendar pra mais algum familiar também?". NÃO mande o convite de compartilhar o link nessa mesma mensagem — espere a resposta dela primeiro.
 - Se ela quiser agendar mais alguém da família, siga o fluxo normal (pegue nome e período da pessoa nova) e confirme com uma marcação ###AGENDAR### pra ela também.
 - Se ela disser que NÃO quer agendar mais ninguém da família, aí sim convide ela a compartilhar o link com amigos e parentes, mais ou menos assim: "Pedimos por gentileza que compartilhe nosso link de agendamento com amigos e familiares para que possam participar também: 👇🏻 https://wa.me/message/ZQKGY2AQYXRKA1" — pode ajustar o texto pra soar natural, mas SEMPRE inclua esse link exatamente como está.
@@ -481,9 +481,17 @@ function horarioValido(horario) {
   return true;
 }
 
+function formatarDataHora(horario) {
+  const mHora = horario.match(/às\s*(\d{2}:\d{2})/i);
+  const hora = mHora ? mHora[1] : "";
+  const mData = horario.match(/^(.*?)\s+(?:em|no|na)\s+/i);
+  const data = mData ? mData[1].trim() : horario.split(" às ")[0].trim();
+  return { data, hora };
+}
+
 function processarResposta(textoIA, jid) {
   let texto = textoIA;
-  const enderecosConfirmados = new Set();
+  const confirmacoes = [];
 
   const pareceConfirmacao = /\*[^*]+\*/.test(texto) && /às\s*\d{2}:\d{2}/i.test(texto);
   const temMarcador = /###AGENDAR###|###REAGENDAR###/.test(texto);
@@ -537,8 +545,7 @@ function processarResposta(textoIA, jid) {
             origem: "whatsapp",
           });
         }
-        const enderecoCidade = CFG.ENDERECOS_POR_CIDADE[extrairCidade(horario)];
-        if (enderecoCidade) enderecosConfirmados.add(enderecoCidade);
+        confirmacoes.push({ nome: dados.nome, horario });
       }
     } catch (e) {
       console.error("Falha ao ler agendamento da IA:", e.message);
@@ -575,8 +582,7 @@ function processarResposta(textoIA, jid) {
         });
         fs.writeFileSync(ARQ_AGENDAMENTOS, JSON.stringify(lista, null, 2));
         console.log("🔄 AGENDAMENTO ALTERADO:", dados.nome, "-", horarioAntigo, "->", horarioNovo);
-        const enderecoCidade = CFG.ENDERECOS_POR_CIDADE[extrairCidade(horarioNovo)];
-        if (enderecoCidade) enderecosConfirmados.add(enderecoCidade);
+        confirmacoes.push({ nome: dados.nome, horario: horarioNovo });
       }
     } catch (e) {
       console.error("Falha ao reagendar:", e.message);
@@ -584,9 +590,19 @@ function processarResposta(textoIA, jid) {
   }
   texto = texto.replace(marcaReagendar, "").trim();
 
-  if (enderecosConfirmados.size > 0) {
-    const linhasEndereco = [...enderecosConfirmados].map((e) => `📍 *${e}*`).join("\n");
-    texto = `${texto}\n\n${linhasEndereco}`;
+  if (confirmacoes.length > 0) {
+    const enderecosUnicos = new Set();
+    const linhas = confirmacoes.map(({ nome, horario }) => {
+      const { data, hora } = formatarDataHora(horario);
+      const endereco = CFG.ENDERECOS_POR_CIDADE[extrairCidade(horario)];
+      if (endereco) enderecosUnicos.add(endereco);
+      const prefixoNome = confirmacoes.length > 1 ? `👤 *${nome}*: ` : "";
+      return `${prefixoNome}📅 *${data}*, às *${hora}*`;
+    });
+    if (enderecosUnicos.size > 0) {
+      linhas.push([...enderecosUnicos].map((e) => `📍 *${e}*`).join("\n"));
+    }
+    texto = `${texto}\n\n${linhas.join("\n")}`;
   }
 
   const marcaTransferir = /###TRANSFERIR_HUMANO###/;
