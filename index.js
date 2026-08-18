@@ -427,7 +427,7 @@ REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 - Quando a pessoa CONFIRMAR um horário NOVO (que não é troca de um já existente) e você já souber o nome dela, finalize sua resposta com esta marcação EXATA em uma linha separada:
 ###AGENDAR###{"nome":"NOME DA PESSOA","horario":"HORÁRIO ESCOLHIDO"}
 - Essa marcação é invisível pra pessoa (o sistema remove). Use UMA marcação ###AGENDAR### pra cada pessoa que está sendo agendada — se a pessoa estiver marcando pra mais de uma (ex: ela e o filho), coloque uma marcação ###AGENDAR### separada pra cada uma, cada uma em sua própria linha, todas na mesma resposta.
-- Na mesma mensagem, confirme pra pessoa: a *data* (sempre por extenso, tipo "21 de agosto", nunca "21/08"), o *horário* e o *local* em negrito, com UM asterisco de cada lado (nunca dois) + que é gratuito.
+- Na mesma mensagem, confirme pra pessoa: a *data* (sempre por extenso, tipo "21 de agosto", nunca "21/08") e o *horário* em negrito, com UM asterisco de cada lado (nunca dois) + que é gratuito. NÃO escreva o nome do local/endereço nessa mensagem — o sistema adiciona automaticamente o endereço certo logo em seguida, então você só precisa confirmar data e horário.
 - Logo depois de confirmar (mesma mensagem, parágrafo seguinte), pergunte se ela quer agendar pra mais algum familiar também, tipo "Quer agendar pra mais algum familiar também?". NÃO mande o convite de compartilhar o link nessa mesma mensagem — espere a resposta dela primeiro.
 - Se ela quiser agendar mais alguém da família, siga o fluxo normal (pegue nome e período da pessoa nova) e confirme com uma marcação ###AGENDAR### pra ela também.
 - Se ela disser que NÃO quer agendar mais ninguém da família, aí sim convide ela a compartilhar o link com amigos e parentes, mais ou menos assim: "Pedimos por gentileza que compartilhe nosso link de agendamento com amigos e familiares para que possam participar também: 👇🏻 https://wa.me/message/ZQKGY2AQYXRKA1" — pode ajustar o texto pra soar natural, mas SEMPRE inclua esse link exatamente como está.
@@ -483,6 +483,7 @@ function horarioValido(horario) {
 
 function processarResposta(textoIA, jid) {
   let texto = textoIA;
+  const enderecosConfirmados = new Set();
 
   const pareceConfirmacao = /\*[^*]+\*/.test(texto) && /às\s*\d{2}:\d{2}/i.test(texto);
   const temMarcador = /###AGENDAR###|###REAGENDAR###/.test(texto);
@@ -527,13 +528,17 @@ function processarResposta(textoIA, jid) {
           "| jid:",
           jid
         );
-      } else if (!jaExiste) {
-        salvarAgendamento({
-          nome: dados.nome,
-          horario,
-          telefone,
-          origem: "whatsapp",
-        });
+      } else {
+        if (!jaExiste) {
+          salvarAgendamento({
+            nome: dados.nome,
+            horario,
+            telefone,
+            origem: "whatsapp",
+          });
+        }
+        const enderecoCidade = CFG.ENDERECOS_POR_CIDADE[extrairCidade(horario)];
+        if (enderecoCidade) enderecosConfirmados.add(enderecoCidade);
       }
     } catch (e) {
       console.error("Falha ao ler agendamento da IA:", e.message);
@@ -570,12 +575,19 @@ function processarResposta(textoIA, jid) {
         });
         fs.writeFileSync(ARQ_AGENDAMENTOS, JSON.stringify(lista, null, 2));
         console.log("🔄 AGENDAMENTO ALTERADO:", dados.nome, "-", horarioAntigo, "->", horarioNovo);
+        const enderecoCidade = CFG.ENDERECOS_POR_CIDADE[extrairCidade(horarioNovo)];
+        if (enderecoCidade) enderecosConfirmados.add(enderecoCidade);
       }
     } catch (e) {
       console.error("Falha ao reagendar:", e.message);
     }
   }
   texto = texto.replace(marcaReagendar, "").trim();
+
+  if (enderecosConfirmados.size > 0) {
+    const linhasEndereco = [...enderecosConfirmados].map((e) => `📍 *${e}*`).join("\n");
+    texto = `${texto}\n\n${linhasEndereco}`;
+  }
 
   const marcaTransferir = /###TRANSFERIR_HUMANO###/;
   if (marcaTransferir.test(texto)) {
