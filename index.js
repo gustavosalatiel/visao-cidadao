@@ -824,15 +824,22 @@ async function iniciarBot() {
           texto.trim() &&
           pareceContatoReal &&
           !idsEnviadosPeloBot.has(msg.key.id) &&
-          Date.now() - (ultimoEnvioAutomatico.get(jid) || 0) >= JANELA_ECO_MS &&
-          !pausados.has(jid)
+          Date.now() - (ultimoEnvioAutomatico.get(jid) || 0) >= JANELA_ECO_MS
         ) {
-          pausados.add(jid);
-          salvarPausados(pausados);
-          console.log(
-            "⏸️  IA pausada (resposta manual detectada) para:",
-            jid.replace("@s.whatsapp.net", "")
-          );
+          let hist = historicos.get(jid) || [];
+          hist.push({ role: "atendente", text: texto.trim() });
+          if (hist.length > MAX_HISTORICO) hist = hist.slice(-MAX_HISTORICO);
+          historicos.set(jid, hist);
+          salvarHistoricos();
+
+          if (!pausados.has(jid)) {
+            pausados.add(jid);
+            salvarPausados(pausados);
+            console.log(
+              "⏸️  IA pausada (resposta manual detectada) para:",
+              jid.replace("@s.whatsapp.net", "")
+            );
+          }
         }
         continue;
       }
@@ -858,8 +865,15 @@ async function iniciarBot() {
         ? jid.split("@")[0]
         : null;
       registrarContato(jid, numeroReal);
-      if (pausados.has(jid)) continue;
       if (!texto.trim()) continue;
+      if (pausados.has(jid)) {
+        let hist = historicos.get(jid) || [];
+        hist.push({ role: "cliente", text: texto.trim() });
+        if (hist.length > MAX_HISTORICO) hist = hist.slice(-MAX_HISTORICO);
+        historicos.set(jid, hist);
+        salvarHistoricos();
+        continue;
+      }
 
       bufferizarMensagem(sock, jid, texto);
     }
@@ -1055,6 +1069,22 @@ function iniciarServidorHTTP(getSock) {
     pausados.add(jid);
     if (!jaEstava) salvarPausados(pausados);
     res.json({ ok: true });
+  });
+
+  app.post("/api/pausar-todos", (req, res) => {
+    const { chave } = req.body || {};
+    if (chave !== CFG.CHAVE_API) {
+      return res.status(401).json({ erro: "Chave inválida" });
+    }
+    let quantidade = 0;
+    for (const telefoneOuLid of Object.keys(contatos)) {
+      const jid = telefoneOuLid.endsWith("@lid") ? telefoneOuLid : telefoneOuLid + "@s.whatsapp.net";
+      if (!pausados.has(jid)) quantidade++;
+      pausados.add(jid);
+    }
+    salvarPausados(pausados);
+    console.log(`⏸️  IA pausada manualmente para todas as ${quantidade} conversas ativas`);
+    res.json({ ok: true, pausados: quantidade });
   });
 
   app.post("/agendamento", async (req, res) => {

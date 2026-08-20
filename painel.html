@@ -625,6 +625,7 @@
         <div style="display:flex; gap:8px; align-items:center;">
           <input type="text" id="buscaConversas" placeholder="Buscar telefone..." />
           <button class="btn-fraco" onclick="retomarTodasIA()">▶️ Retomar todas</button>
+          <button class="btn-fraco" onclick="pausarTodasIA()">⏸️ Parar todas</button>
         </div>
       </div>
       <div class="secao-body" id="listaConversas"></div>
@@ -1143,6 +1144,19 @@ async function retomarTodasIA() {
   });
   const d = await resp.json();
   if (resp.ok) alert(`IA retomada em ${d.retomados} conversa${d.retomados === 1 ? "" : "s"}.`);
+  atualizar();
+}
+
+async function pausarTodasIA() {
+  if (!confirm("Parar a IA em TODAS as conversas ativas? Ninguém vai receber resposta automática até você retomar.")) return;
+  const chave = localStorage.getItem(LS_CHAVE);
+  const resp = await fetch("/api/pausar-todos", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chave }),
+  });
+  const d = await resp.json();
+  if (resp.ok) alert(`IA parada em ${d.pausados} conversa${d.pausados === 1 ? "" : "s"}.`);
   atualizar();
 }
 
