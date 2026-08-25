@@ -993,12 +993,11 @@ function renderizarAgenda() {
     else outros.push(ag);
   }
 
-  const cidadesConhecidas = new Set(dados.cidades.map((g) => g.cidade));
   const outrosPorCidade = new Map();
   const outrosSemCidade = [];
   for (const ag of outros) {
     const cidade = extrairCidadeCliente(ag.horario);
-    if (cidade && cidadesConhecidas.has(cidade)) {
+    if (cidade) {
       if (!outrosPorCidade.has(cidade)) outrosPorCidade.set(cidade, []);
       outrosPorCidade.get(cidade).push(ag);
     } else {
@@ -1056,7 +1055,9 @@ function renderizarAgenda() {
     `;
   }
 
+  const cidadesForaRenderizadas = new Set();
   for (const grupo of dados.cidades) {
+    cidadesForaRenderizadas.add(grupo.cidade);
     const foraDoPadrao = bateLista(outrosPorCidade.get(grupo.cidade) || []);
     if (foraDoPadrao.length === 0) continue;
     const chaveFora = `fora:${grupo.cidade}`;
@@ -1064,6 +1065,22 @@ function renderizarAgenda() {
       <details class="municipio-grupo" data-key="${chaveFora}" ${estaAberto(chaveFora, true) ? "open" : ""}>
         <summary>
           <span>⏱️ Fora do padrão — ${grupo.cidade}</span>
+          <span class="badge-cidade">${foraDoPadrao.length} agendado${foraDoPadrao.length === 1 ? "" : "s"}</span>
+        </summary>
+        <ul class="lista-pessoas">${foraDoPadrao.map((p) => linhaAgendamento(p, true)).join("")}</ul>
+      </details>
+    `;
+  }
+
+  for (const [cidade, lista] of outrosPorCidade) {
+    if (cidadesForaRenderizadas.has(cidade)) continue;
+    const foraDoPadrao = bateLista(lista);
+    if (foraDoPadrao.length === 0) continue;
+    const chaveFora = `fora:${cidade}`;
+    html += `
+      <details class="municipio-grupo" data-key="${chaveFora}" ${estaAberto(chaveFora, true) ? "open" : ""}>
+        <summary>
+          <span>⏱️ Fora do padrão — ${cidade}</span>
           <span class="badge-cidade">${foraDoPadrao.length} agendado${foraDoPadrao.length === 1 ? "" : "s"}</span>
         </summary>
         <ul class="lista-pessoas">${foraDoPadrao.map((p) => linhaAgendamento(p, true)).join("")}</ul>
