@@ -1017,73 +1017,63 @@ function renderizarAgenda() {
   }
 
   let html = "";
-  for (const grupo of dados.cidades) {
-    const linhasHorario = grupo.horarios
-      .filter((h) => bate(porHorario.get(h) || [], h))
-      .map((h) => {
-        const pessoas = porHorario.get(h) || [];
-        const chaveHorario = `horario:${h}`;
-        return `
-          <details class="horario-sub" data-key="${chaveHorario}" ${estaAberto(chaveHorario, pessoas.length > 0) ? "open" : ""}>
-            <summary>
-              <span>${h}</span>
-              <span class="badge ${pessoas.length === 0 ? "zero" : ""}">${pessoas.length} agendado${pessoas.length === 1 ? "" : "s"}</span>
-            </summary>
-            ${
-              pessoas.length === 0
-                ? `<div class="vazio-msg">Nenhum agendamento ainda.</div>`
-                : `<ul class="lista-pessoas">${pessoas.map((p) => linhaAgendamento(p, false)).join("")}</ul>`
-            }
-          </details>
-        `;
-      })
-      .join("");
+  const cidadesOrdenadas = dados.cidades.map((g) => g.cidade);
+  for (const cidade of outrosPorCidade.keys()) {
+    if (!cidadesOrdenadas.includes(cidade)) cidadesOrdenadas.push(cidade);
+  }
 
-    if (!linhasHorario) continue;
+  for (const cidade of cidadesOrdenadas) {
+    const grupo = dados.cidades.find((g) => g.cidade === cidade);
+    const linhasHorario = grupo
+      ? grupo.horarios
+          .filter((h) => bate(porHorario.get(h) || [], h))
+          .map((h) => {
+            const pessoas = porHorario.get(h) || [];
+            const chaveHorario = `horario:${h}`;
+            return `
+              <details class="horario-sub" data-key="${chaveHorario}" ${estaAberto(chaveHorario, pessoas.length > 0) ? "open" : ""}>
+                <summary>
+                  <span>${h}</span>
+                  <span class="badge ${pessoas.length === 0 ? "zero" : ""}">${pessoas.length} agendado${pessoas.length === 1 ? "" : "s"}</span>
+                </summary>
+                ${
+                  pessoas.length === 0
+                    ? `<div class="vazio-msg">Nenhum agendamento ainda.</div>`
+                    : `<ul class="lista-pessoas">${pessoas.map((p) => linhaAgendamento(p, false)).join("")}</ul>`
+                }
+              </details>
+            `;
+          })
+          .join("")
+      : "";
 
-    const totalCidade = grupo.horarios.reduce((soma, h) => soma + (porHorario.get(h) || []).length, 0);
+    const foraDoPadrao = bateLista(outrosPorCidade.get(cidade) || []);
+    const chaveFora = `fora:${cidade}`;
+    const blocoFora = foraDoPadrao.length
+      ? `
+        <details class="horario-sub" data-key="${chaveFora}" ${estaAberto(chaveFora, true) ? "open" : ""}>
+          <summary>
+            <span>⏱️ Fora do padrão</span>
+            <span class="badge">${foraDoPadrao.length} agendado${foraDoPadrao.length === 1 ? "" : "s"}</span>
+          </summary>
+          <ul class="lista-pessoas">${foraDoPadrao.map((p) => linhaAgendamento(p, true)).join("")}</ul>
+        </details>
+      `
+      : "";
 
-    const chaveCidade = `cidade:${grupo.cidade}`;
+    if (!linhasHorario && !blocoFora) continue;
+
+    const totalHorarios = grupo ? grupo.horarios.reduce((soma, h) => soma + (porHorario.get(h) || []).length, 0) : 0;
+    const totalCidade = totalHorarios + foraDoPadrao.length;
+
+    const chaveCidade = `cidade:${cidade}`;
     html += `
       <details class="municipio-grupo" data-key="${chaveCidade}" ${estaAberto(chaveCidade, true) ? "open" : ""}>
         <summary>
-          <span>📍 ${grupo.cidade}</span>
+          <span>📍 ${cidade}</span>
           <span class="badge-cidade">${totalCidade} agendado${totalCidade === 1 ? "" : "s"}</span>
         </summary>
-        ${linhasHorario}
-      </details>
-    `;
-  }
-
-  const cidadesForaRenderizadas = new Set();
-  for (const grupo of dados.cidades) {
-    cidadesForaRenderizadas.add(grupo.cidade);
-    const foraDoPadrao = bateLista(outrosPorCidade.get(grupo.cidade) || []);
-    if (foraDoPadrao.length === 0) continue;
-    const chaveFora = `fora:${grupo.cidade}`;
-    html += `
-      <details class="municipio-grupo" data-key="${chaveFora}" ${estaAberto(chaveFora, true) ? "open" : ""}>
-        <summary>
-          <span>⏱️ Fora do padrão — ${grupo.cidade}</span>
-          <span class="badge-cidade">${foraDoPadrao.length} agendado${foraDoPadrao.length === 1 ? "" : "s"}</span>
-        </summary>
-        <ul class="lista-pessoas">${foraDoPadrao.map((p) => linhaAgendamento(p, true)).join("")}</ul>
-      </details>
-    `;
-  }
-
-  for (const [cidade, lista] of outrosPorCidade) {
-    if (cidadesForaRenderizadas.has(cidade)) continue;
-    const foraDoPadrao = bateLista(lista);
-    if (foraDoPadrao.length === 0) continue;
-    const chaveFora = `fora:${cidade}`;
-    html += `
-      <details class="municipio-grupo" data-key="${chaveFora}" ${estaAberto(chaveFora, true) ? "open" : ""}>
-        <summary>
-          <span>⏱️ Fora do padrão — ${cidade}</span>
-          <span class="badge-cidade">${foraDoPadrao.length} agendado${foraDoPadrao.length === 1 ? "" : "s"}</span>
-        </summary>
-        <ul class="lista-pessoas">${foraDoPadrao.map((p) => linhaAgendamento(p, true)).join("")}</ul>
+        ${linhasHorario}${blocoFora}
       </details>
     `;
   }
