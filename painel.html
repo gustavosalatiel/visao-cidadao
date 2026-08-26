@@ -348,6 +348,10 @@
     transition: filter .15s ease;
   }
   .municipio-grupo summary:hover { filter: brightness(1.08); }
+  .municipio-grupo.grupo-arquivado > summary { background: linear-gradient(135deg, #6B7280, #4B5563); }
+  .subgrupo-arquivado { padding: 10px; }
+  .subgrupo-arquivado .municipio-grupo { margin-top: 10px; }
+  .subgrupo-arquivado .municipio-grupo:first-child { margin-top: 0; }
   .municipio-grupo summary .badge-cidade {
     display: inline-block;
     padding: 3px 12px;
@@ -1028,7 +1032,9 @@ function renderizarAgenda() {
     return pessoas.filter((p) => telefoneBate(termo, p.nome, p.telefone, p.horario));
   }
 
-  let html = "";
+  let htmlAtivas = "";
+  let htmlPassadas = "";
+  let totalCidadesPassadas = 0;
   const cidadesOrdenadas = dados.cidades.map((g) => g.cidade);
   for (const cidade of outrosPorCidade.keys()) {
     if (!cidadesOrdenadas.includes(cidade)) cidadesOrdenadas.push(cidade);
@@ -1079,13 +1085,33 @@ function renderizarAgenda() {
     const totalCidade = totalHorarios + foraDoPadrao.length;
 
     const chaveCidade = `cidade:${cidade}`;
-    html += `
+    const blocoCidade = `
       <details class="municipio-grupo" data-key="${chaveCidade}" ${estaAberto(chaveCidade, true) ? "open" : ""}>
         <summary>
           <span>📍 ${cidade}</span>
           <span class="badge-cidade">${totalCidade} agendado${totalCidade === 1 ? "" : "s"}</span>
         </summary>
         ${linhasHorario}${blocoFora}
+      </details>
+    `;
+
+    if (grupo && grupo.passada) {
+      totalCidadesPassadas++;
+      htmlPassadas += blocoCidade;
+    } else {
+      htmlAtivas += blocoCidade;
+    }
+  }
+
+  let html = htmlAtivas;
+  if (htmlPassadas) {
+    html += `
+      <details class="municipio-grupo grupo-arquivado" data-key="ja-atendidas" ${estaAberto("ja-atendidas", false) ? "open" : ""}>
+        <summary>
+          <span>✅ Cidades já atendidas</span>
+          <span class="badge-cidade">${totalCidadesPassadas} cidade${totalCidadesPassadas === 1 ? "" : "s"}</span>
+        </summary>
+        <div class="subgrupo-arquivado">${htmlPassadas}</div>
       </details>
     `;
   }

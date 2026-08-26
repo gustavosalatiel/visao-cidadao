@@ -149,7 +149,11 @@ function agruparHorariosPorCidade(horarios) {
     if (!mapa.has(cidade)) mapa.set(cidade, []);
     mapa.get(cidade).push(h);
   }
-  return [...mapa.entries()].map(([cidade, lista]) => ({ cidade, horarios: lista }));
+  return [...mapa.entries()].map(([cidade, lista]) => ({
+    cidade,
+    horarios: lista,
+    passada: lista.every((h) => horarioJaPassou(h)),
+  }));
 }
 
 const TIPOS_ACAO_MENSAGEM = [
