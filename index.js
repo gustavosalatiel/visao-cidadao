@@ -441,31 +441,51 @@ REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 - Se perguntarem sobre preços de óculos, responda, mas deixe claro que a compra nunca é obrigatória.`;
 }
 
-async function transcreverAudio(base64Audio, mimeType) {
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${CFG.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: "Transcreva esse áudio em português do Brasil. Responda APENAS com a transcrição do que foi falado, sem comentários, sem aspas, sem nada a mais." },
-              { inline_data: { mime_type: mimeType, data: base64Audio } },
-            ],
-          },
-        ],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 300 },
-      }),
+const GEMINI_TIMEOUT_MS = 25000;
+const GEMINI_MAX_TENTATIVAS = 3;
+
+async function chamarGemini(body, tentativa = 1) {
+  const controlador = new AbortController();
+  const timeoutId = setTimeout(() => controlador.abort(), GEMINI_TIMEOUT_MS);
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${CFG.GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controlador.signal,
+      }
+    );
+    if (!resp.ok) {
+      const erro = await resp.text();
+      throw new Error(`Gemini ${resp.status}: ${erro.slice(0, 200)}`);
     }
-  );
-  if (!resp.ok) {
-    const erro = await resp.text();
-    throw new Error(`Gemini (transcrição) ${resp.status}: ${erro.slice(0, 200)}`);
+    return await resp.json();
+  } catch (e) {
+    if (tentativa < GEMINI_MAX_TENTATIVAS) {
+      await espera(800 * tentativa);
+      return chamarGemini(body, tentativa + 1);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  const data = await resp.json();
+}
+
+async function transcreverAudio(base64Audio, mimeType) {
+  const data = await chamarGemini({
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: "Transcreva esse áudio em português do Brasil. Responda APENAS com a transcrição do que foi falado, sem comentários, sem aspas, sem nada a mais." },
+          { inline_data: { mime_type: mimeType, data: base64Audio } },
+        ],
+      },
+    ],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 300 },
+  });
   return (data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
 }
 
@@ -475,25 +495,12 @@ async function perguntarIA(historico, jid) {
     parts: [{ text: m.text }],
   }));
 
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${CFG.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: promptSistema(jid) }] },
-        contents,
-        generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
-      }),
-    }
-  );
+  const data = await chamarGemini({
+    system_instruction: { parts: [{ text: promptSistema(jid) }] },
+    contents,
+    generationConfig: { temperature: 0.7, maxOutputTokens: 500 },
+  });
 
-  if (!resp.ok) {
-    const erro = await resp.text();
-    throw new Error(`Gemini ${resp.status}: ${erro.slice(0, 200)}`);
-  }
-
-  const data = await resp.json();
   return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
@@ -663,35 +670,44 @@ async function responder(sock, jid, textoRecebido) {
   salvarHistoricos();
 
   let resposta;
+  let houveErroIA = false;
   try {
     resposta = await perguntarIA(hist, jid);
+    resposta = processarResposta(resposta, jid);
+    resposta = resposta.replace(/\*\*(.+?)\*\*/g, "*$1*");
+    if (!resposta) resposta = "Um momentinho... 😊";
   } catch (e) {
     console.error("Erro na IA:", e.message);
+    houveErroIA = true;
     resposta =
-      `Oi! Aqui é da ${CFG.NOME_EMPRESA} 😊 Nosso sistema deu uma engasgada, ` +
-      `mas já já te respondo. Se preferir, me diz seu nome e o melhor horário ` +
-      `que eu já deixo seu exame gratuito reservado!`;
+      `Oi! Aqui é da ${CFG.NOME_EMPRESA} 😅 Deu uma falha rapidinha aqui do nosso lado agora. ` +
+      `Pode mandar sua mensagem de novo?`;
   }
-
-  resposta = processarResposta(resposta, jid);
-  resposta = resposta.replace(/\*\*(.+?)\*\*/g, "*$1*");
-  if (!resposta) resposta = "Um momentinho... 😊";
-
-  hist.push({ role: "atendente", text: resposta });
-  historicos.set(jid, hist);
-  salvarHistoricos();
 
   try {
     await sock.sendPresenceUpdate("composing", jid);
   } catch {}
   const atrasoDigitando = 2000 + Math.random() * 3000;
   await espera(atrasoDigitando);
-  const enviada = await sock.sendMessage(jid, { text: resposta });
+
+  let enviada;
+  try {
+    enviada = await sock.sendMessage(jid, { text: resposta });
+  } catch (e) {
+    console.error("Erro ao enviar mensagem pro cliente:", e.message);
+    return;
+  }
   try {
     await sock.sendPresenceUpdate("paused", jid);
   } catch {}
   registrarIdEnviado(enviada?.key?.id);
   ultimoEnvioAutomatico.set(jid, Date.now());
+
+  if (!houveErroIA) {
+    hist.push({ role: "atendente", text: resposta });
+    historicos.set(jid, hist);
+    salvarHistoricos();
+  }
 }
 
 const LEMBRETE_INATIVIDADE_MS = 60 * 60 * 1000; // 1 hora sem resposta
