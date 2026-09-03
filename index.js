@@ -381,7 +381,7 @@ function promptSistema(jid) {
   for (const a of todosAgendamentos) {
     contagemPorHorario[a.horario] = (contagemPorHorario[a.horario] || 0) + 1;
   }
-  const horariosAtivos = CFG.HORARIOS.filter((h) => !horarioJaPassou(h));
+  const horariosAtivos = CFG.HORARIOS.filter((h) => !horarioJaPassou(h) && !horarioFechadoParaNovos(h));
   const cidadesAtivasPorEstado = {};
   for (const h of horariosAtivos) {
     const cidade = extrairCidade(h);
@@ -413,7 +413,7 @@ SEU OBJETIVO:
 2.1.2. CASO ESPECIAL — ITAITUBA/MORAES DE ALMEIDA: Moraes de Almeida é um distrito de Itaituba-PA. Se a pessoa disser que é de Itaituba (ou da região), NÃO diga que não tem atendimento lá — trate como a mesma cidade "Moraes de Almeida-PA" da lista e ofereça os horários normalmente.
 2.1.3. CASO ESPECIAL — RURÓPOLIS/DIVINÓPOLIS: Divinópolis (Km-70) é um distrito de Rurópolis-PA. Se a pessoa disser que é de Rurópolis (ou da região), NÃO diga que não tem atendimento lá — trate como a mesma cidade "Divinópolis-PA" da lista e ofereça os horários normalmente.
 2.1.5. CASO ESPECIAL — PESSOA DISSE SÓ O ESTADO, SEM CIDADE (ex: "sou do Pará", "moro no Acre"): cidades ativas por estado agora: ${resumoPorEstado || "nenhuma"}. Antes de dizer que não tem atendimento, veja se o estado que ela mencionou está nessa lista. Se estiver, NUNCA diga que não tem atendimento nesse estado — pergunte de qual cidade/região específica dentro do estado ela é, citando as cidades ativas daquele estado como opção (ex: "Legal! No Pará estamos atendendo em Moraes de Almeida, Bela Vista do Caracol, Trairão e Divinópolis — qual dessas fica mais perto de você?"). Só diga que não tem atendimento se o estado dela realmente não tiver nenhuma cidade ativa na lista.
-2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA: os dias 14 e 15 de setembro já estão com a agenda cheia. Para pessoas NOVAS que ainda não têm agendamento em Moraes de Almeida, ofereça SOMENTE os dias 16 ou 17 de setembro — não ofereça mais os dias 14 ou 15 pra ninguém novo, mesmo que algum horário deles apareça na lista com vaga sobrando. NUNCA diga pra pessoa que os dias 14 ou 15 estão cheios/lotados/esgotados — apenas ofereça direto os dias 16 ou 17 normalmente, sem mencionar que os outros dias encheram.
+2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA: os dias 14 e 15 de setembro já estão com a agenda cheia (esses dois dias já foram removidos da lista de horários disponíveis, então nem vão aparecer pra você). Entre os dias 16 e 17 que sobraram, priorize SEMPRE o dia 17 de setembro pra gente NOVA — escolha e confirme direto num horário do dia 17, sem perguntar qual dia ela prefere. Só ofereça o dia 16 de setembro se a pessoa disser que não consegue no dia 17, e nesse caso use APENAS um horário realmente vago do dia 16 (08:00, 09:00, 10:00, 14:00, 15:00 ou 16:00 que ainda não esteja em ${VAGAS_POR_HORARIO}/${VAGAS_POR_HORARIO}) — NÃO invente horário fora dos redondos pro dia 16 (a regra 2.2 de flexibilizar horário fora dos redondos não vale pro dia 16, porque ele já está quase cheio). NUNCA diga pra pessoa que os dias 14, 15 ou 16 estão cheios/lotados/esgotados — apenas ofereça o dia certo normalmente, sem mencionar lotação.
 2.1.6. CASO ESPECIAL — DIVINÓPOLIS-PA: para pessoas NOVAS, priorize SEMPRE o dia 23 de setembro (não o dia 22) — escolha e confirme direto num horário do dia 23, sem perguntar qual dia ela prefere. Só ofereça o dia 22 de setembro se a pessoa disser que não consegue no dia 23.
 2.2. LIMITE DE VAGAS: cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas. Se TODOS os horários redondos daquele período (manhã: 08:00, 09:00, 10:00 / tarde: 14:00, 15:00, 16:00) já estiverem em ${VAGAS_POR_HORARIO}/${VAGAS_POR_HORARIO}, escolha sozinha um horário fora dos redondos mas dentro da mesma janela (manhã entre 08:00 e 12:00, tarde entre 14:00 e 18:00) que ainda não esteja cheio, e confirme nele do mesmo jeito — sem perguntar, você decide.
 3. Se, DEPOIS de você já ter confirmado um horário, a pessoa disser que esse horário não vai dar mais pra ela, aí sim pergunte "certo, qual horário fica melhor pra você?" oferecendo a janela ampla daquele período pra ela escolher (manhã: entre 08:00 e 12:00 / tarde: entre 14:00 e 18:00). Quando ela escolher, use a marcação ###REAGENDAR### pra trocar o horário anterior por esse novo, como descrito nas REGRAS DO AGENDAMENTO abaixo.
@@ -526,12 +526,25 @@ function nomeValido(nome) {
   return true;
 }
 
+// Dias com capacidade fechada pra gente nova (relatado pela equipe por causa de lotação),
+// mesmo ainda sendo data futura. Atualizar aqui conforme a equipe avisar de novas lotações.
+const STEMS_FECHADOS_PARA_NOVOS = [
+  "Segunda-feira 14 de setembro em Moraes de Almeida-PA",
+  "Terça-feira 15 de setembro em Moraes de Almeida-PA",
+];
+
+function horarioFechadoParaNovos(horario) {
+  const semHora = (horario || "").replace(/às\s*\d{2}:\d{2}/i, "").trim();
+  return STEMS_FECHADOS_PARA_NOVOS.includes(semHora);
+}
+
 function horarioValido(horario) {
   const texto = (horario || "").trim();
   if (!texto) return false;
   const semHora = texto.replace(/às\s*\d{2}:\d{2}/i, "").trim();
   const baseReal = CFG.HORARIOS.some((h) => h.replace(/às\s*\d{2}:\d{2}/i, "").trim() === semHora);
   if (!baseReal) return false;
+  if (horarioFechadoParaNovos(texto)) return false;
   if (horarioJaPassou(texto)) return false;
   return true;
 }
