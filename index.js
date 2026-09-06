@@ -456,7 +456,7 @@ REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 }
 
 const GEMINI_TIMEOUT_MS = 25000;
-const GEMINI_MAX_TENTATIVAS = 3;
+const GEMINI_MAX_TENTATIVAS = 5;
 
 async function chamarGemini(body, tentativa = 1) {
   const controlador = new AbortController();
@@ -478,7 +478,7 @@ async function chamarGemini(body, tentativa = 1) {
     return await resp.json();
   } catch (e) {
     if (tentativa < GEMINI_MAX_TENTATIVAS) {
-      await espera(800 * tentativa);
+      await espera(1000 * tentativa);
       return chamarGemini(body, tentativa + 1);
     }
     throw e;
