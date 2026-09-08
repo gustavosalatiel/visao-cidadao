@@ -33,6 +33,16 @@ function carregarAgendamentos() {
   }
 }
 
+// Caches (historico/contatos/pausados) não podem derrubar o atendimento se o
+// arquivo estiver travado (ex: OneDrive sincronizando) — só o agendamento é crítico.
+function salvarJsonSeguro(arquivo, dados, rotulo) {
+  try {
+    fs.writeFileSync(arquivo, JSON.stringify(dados, null, 2));
+  } catch (e) {
+    console.error(`Erro ao salvar ${rotulo} (atendimento segue normal):`, e.message);
+  }
+}
+
 function salvarAgendamento(dados) {
   const lista = carregarAgendamentos();
   lista.push({ ...dados, criadoEm: new Date().toISOString() });
@@ -52,7 +62,7 @@ function carregarPausados() {
 }
 
 function salvarPausados(set) {
-  fs.writeFileSync(ARQ_PAUSADOS, JSON.stringify([...set], null, 2));
+  salvarJsonSeguro(ARQ_PAUSADOS, [...set], "pausados");
 }
 
 const pausados = carregarPausados();
@@ -68,7 +78,7 @@ function carregarContatos() {
 }
 
 function salvarContatos(obj) {
-  fs.writeFileSync(ARQ_CONTATOS, JSON.stringify(obj, null, 2));
+  salvarJsonSeguro(ARQ_CONTATOS, obj, "contatos");
 }
 
 const contatos = carregarContatos();
@@ -318,7 +328,7 @@ function carregarHistoricos() {
 }
 
 function salvarHistoricos() {
-  fs.writeFileSync(ARQ_HISTORICOS, JSON.stringify(Object.fromEntries(historicos), null, 2));
+  salvarJsonSeguro(ARQ_HISTORICOS, Object.fromEntries(historicos), "historicos");
 }
 
 const historicos = carregarHistoricos();
@@ -415,6 +425,7 @@ SEU OBJETIVO:
 2.1.5. CASO ESPECIAL — PESSOA DISSE SÓ O ESTADO, SEM CIDADE (ex: "sou do Pará", "moro no Acre"): cidades ativas por estado agora: ${resumoPorEstado || "nenhuma"}. Antes de dizer que não tem atendimento, veja se o estado que ela mencionou está nessa lista. Se estiver, NUNCA diga que não tem atendimento nesse estado — pergunte de qual cidade/região específica dentro do estado ela é, citando as cidades ativas daquele estado como opção (ex: "Legal! No Pará estamos atendendo em Moraes de Almeida, Bela Vista do Caracol, Trairão e Divinópolis — qual dessas fica mais perto de você?"). Só diga que não tem atendimento se o estado dela realmente não tiver nenhuma cidade ativa na lista.
 2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA: os dias 14, 15 e 16 de setembro já estão com a agenda cheia (esses três dias já foram removidos da lista de horários disponíveis, então nem vão aparecer pra você). A partir de agora, pra gente NOVA em Moraes de Almeida, SÓ existe o dia 17 de setembro — escolha e confirme direto num horário do dia 17, sem perguntar qual dia ela prefere. NUNCA diga pra pessoa que os dias 14, 15 ou 16 estão cheios/lotados/esgotados — apenas ofereça o dia 17 normalmente, sem mencionar lotação.
 2.1.6. CASO ESPECIAL — DIVINÓPOLIS-PA: para pessoas NOVAS, priorize SEMPRE o dia 23 de setembro (não o dia 22) — escolha e confirme direto num horário do dia 23, sem perguntar qual dia ela prefere. Só ofereça o dia 22 de setembro se a pessoa disser que não consegue no dia 23.
+2.1.7. CASO ESPECIAL — TRAIRÃO-PA: para pessoas NOVAS, agende SOMENTE no dia 21 de setembro — escolha e confirme direto num horário do dia 21, sem perguntar qual dia ela prefere e sem mencionar o dia 20 como opção. O dia 20 de setembro é EXCEÇÃO: só ofereça (e agende) o dia 20 se a própria pessoa disser que NÃO consegue de jeito nenhum no dia 21 (ex: "só posso no domingo"). Nunca diga que o dia 20 está cheio ou indisponível — apenas não ofereça, a menos que a pessoa diga que só consegue nesse dia.
 2.2. LIMITE DE VAGAS: cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas. Se TODOS os horários redondos daquele período (manhã: 08:00, 09:00, 10:00 / tarde: 14:00, 15:00, 16:00) já estiverem em ${VAGAS_POR_HORARIO}/${VAGAS_POR_HORARIO}, escolha sozinha um horário fora dos redondos mas dentro da mesma janela (manhã entre 08:00 e 12:00, tarde entre 14:00 e 18:00) que ainda não esteja cheio, e confirme nele do mesmo jeito — sem perguntar, você decide.
 3. Se, DEPOIS de você já ter confirmado um horário, a pessoa disser que esse horário não vai dar mais pra ela, aí sim pergunte "certo, qual horário fica melhor pra você?" oferecendo a janela ampla daquele período pra ela escolher (manhã: entre 08:00 e 12:00 / tarde: entre 14:00 e 18:00). Quando ela escolher, use a marcação ###REAGENDAR### pra trocar o horário anterior por esse novo, como descrito nas REGRAS DO AGENDAMENTO abaixo.
 3.1. NUNCA descarte ou desanime a pessoa por causa de horário. Sempre que for usar um horário fora dos horários redondos da lista (seja porque os redondos encheram, seja porque a pessoa pediu um horário específico depois de recusar o primeiro), a marcação ###AGENDAR### ou ###REAGENDAR### tem que usar EXATAMENTE o texto de um horário daquele mesmo dia/cidade que já está na lista HORÁRIOS DISPONÍVEIS, só trocando a parte final "às HH:MM" — nunca mude a data, o ano, a cidade nem a ordem das palavras, e nunca invente um ano diferente do que está na lista (a lista não tem ano, então você também não escreve ano nenhum).
@@ -853,9 +864,27 @@ async function iniciarBot() {
       const jid = msg.key.remoteJid;
       if (!jid || jid.endsWith("@g.us") || jid.endsWith("@broadcast") || jid.endsWith("@newsletter")) continue;
 
+      // Mensagens temporárias/visualização única chegam embrulhadas num nível a mais
+      let conteudo = msg.message;
+      while (
+        conteudo?.ephemeralMessage?.message ||
+        conteudo?.viewOnceMessage?.message ||
+        conteudo?.viewOnceMessageV2?.message ||
+        conteudo?.documentWithCaptionMessage?.message
+      ) {
+        conteudo = (
+          conteudo.ephemeralMessage ||
+          conteudo.viewOnceMessage ||
+          conteudo.viewOnceMessageV2 ||
+          conteudo.documentWithCaptionMessage
+        ).message;
+      }
+
       let texto =
-        msg.message?.conversation ||
-        msg.message?.extendedTextMessage?.text ||
+        conteudo?.conversation ||
+        conteudo?.extendedTextMessage?.text ||
+        conteudo?.imageMessage?.caption ||
+        conteudo?.videoMessage?.caption ||
         "";
 
       if (msg.key.fromMe) {
@@ -893,14 +922,22 @@ async function iniciarBot() {
         continue;
       }
 
-      if (!texto.trim() && msg.message?.audioMessage) {
+      const tipoMsg = Object.keys(conteudo || {})[0] || "desconhecido";
+      console.log(
+        "📩 Recebida de",
+        jid.replace("@s.whatsapp.net", ""),
+        "| tipo:", tipoMsg,
+        "|", texto ? texto.slice(0, 80) : "(sem texto)"
+      );
+
+      if (!texto.trim() && conteudo?.audioMessage) {
         try {
           const buffer = await downloadMediaMessage(msg, "buffer", {}, {
             logger: pino({ level: "silent" }),
             reuploadRequest: sock.updateMediaMessage,
           });
           const base64Audio = buffer.toString("base64");
-          const mimeType = msg.message.audioMessage.mimetype || "audio/ogg";
+          const mimeType = conteudo.audioMessage.mimetype || "audio/ogg";
           texto = await transcreverAudio(base64Audio, mimeType);
           console.log("🎤 Áudio transcrito de", jid.replace("@s.whatsapp.net", ""), ":", texto.slice(0, 150));
         } catch (e) {
@@ -916,6 +953,7 @@ async function iniciarBot() {
       registrarContato(jid, numeroReal);
       if (!texto.trim()) continue;
       if (pausados.has(jid)) {
+        console.log("⏸️  Sem resposta automática (contato pausado):", jid.replace("@s.whatsapp.net", ""));
         let hist = historicos.get(jid) || [];
         hist.push({ role: "cliente", text: texto.trim() });
         if (hist.length > MAX_HISTORICO) hist = hist.slice(-MAX_HISTORICO);
