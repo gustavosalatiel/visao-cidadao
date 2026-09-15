@@ -383,6 +383,67 @@ function telefonesEquivalentes(a, b) {
 
 const VAGAS_POR_HORARIO = 20;
 
+function stemDoHorario(horario) {
+  return (horario || "").replace(/às\s*\d{2}:\d{2}/i, "").trim();
+}
+
+function periodoDoHorario(horario) {
+  const m = (horario || "").match(/às\s*(\d{2}):\d{2}/i);
+  if (!m) return null;
+  return Number(m[1]) < 12 ? "manhã" : "tarde";
+}
+
+function contagemDoHorario(agendamentos, horario) {
+  return agendamentos.filter((a) => a.horario === horario).length;
+}
+
+function contagemDoPeriodo(agendamentos, horario) {
+  const stem = stemDoHorario(horario);
+  const periodo = periodoDoHorario(horario);
+  return agendamentos.filter(
+    (a) => stemDoHorario(a.horario) === stem && periodoDoHorario(a.horario) === periodo
+  ).length;
+}
+
+function horarioComCapacidade(horario, agendamentos, quantidade = 1) {
+  return contagemDoHorario(agendamentos, horario) + quantidade <= VAGAS_POR_HORARIO;
+}
+
+function ordenarHorariosEquilibrados(horarios, agendamentos) {
+  const grupos = new Map();
+  for (const horario of horarios) {
+    const stem = stemDoHorario(horario);
+    if (!grupos.has(stem)) grupos.set(stem, []);
+    grupos.get(stem).push(horario);
+  }
+
+  return [...grupos.values()].flatMap((grupo) =>
+    grupo.sort((a, b) => {
+      const diferencaPeriodo =
+        contagemDoPeriodo(agendamentos, a) - contagemDoPeriodo(agendamentos, b);
+      if (diferencaPeriodo !== 0) return diferencaPeriodo;
+
+      const diferencaHorario =
+        contagemDoHorario(agendamentos, a) - contagemDoHorario(agendamentos, b);
+      if (diferencaHorario !== 0) return diferencaHorario;
+
+      return CFG.HORARIOS.indexOf(a) - CFG.HORARIOS.indexOf(b);
+    })
+  );
+}
+
+function escolherHorarioEquilibrado(horarioSolicitado, agendamentos, quantidade = 1) {
+  const stem = stemDoHorario(horarioSolicitado);
+  const candidatos = CFG.HORARIOS.filter(
+    (h) =>
+      stemDoHorario(h) === stem &&
+      !horarioJaPassou(h) &&
+      !horarioFechadoParaNovos(h) &&
+      horarioComCapacidade(h, agendamentos, quantidade)
+  );
+  return ordenarHorariosEquilibrados(candidatos, agendamentos)[0] || horarioSolicitado;
+}
+
 function promptSistema(jid) {
   const telefone = resolverTelefone(jid);
   const todosAgendamentos = carregarAgendamentos();
@@ -391,7 +452,15 @@ function promptSistema(jid) {
   for (const a of todosAgendamentos) {
     contagemPorHorario[a.horario] = (contagemPorHorario[a.horario] || 0) + 1;
   }
-  const horariosAtivos = CFG.HORARIOS.filter((h) => !horarioJaPassou(h) && !horarioFechadoParaNovos(h));
+  const horariosAtivos = ordenarHorariosEquilibrados(
+    CFG.HORARIOS.filter(
+      (h) =>
+        !horarioJaPassou(h) &&
+        !horarioFechadoParaNovos(h) &&
+        horarioComCapacidade(h, todosAgendamentos)
+    ),
+    todosAgendamentos
+  );
   const cidadesAtivasPorEstado = {};
   for (const h of horariosAtivos) {
     const cidade = extrairCidade(h);
@@ -418,21 +487,22 @@ SEU OBJETIVO:
 0. IMPORTANTE — MEMÓRIA: o histórico de mensagens abaixo é permanente, mesmo que a última conversa tenha sido há dias ou semanas. Se o nome da pessoa já aparece em mensagens anteriores no histórico, você JÁ CONHECE essa pessoa — chame ela pelo nome desde a primeira resposta e NÃO peça nome/cidade de novo (só pergunte de novo se for pra um NOVO agendamento e o horário anterior já passou). Trate isso como se você realmente lembrasse da pessoa.
 1. Se for a primeira conversa (nome não aparece no histórico), seja direta desde a primeira mensagem: dê boas-vindas e já peça o nome completo e a cidade da pessoa para reservar o exame gratuito. Não pergunte como a pessoa está se sentindo nem faça perguntas exploratórias. Exemplo de abertura: "Oi! Aqui é do projeto Visão Cidadão 😊 para realizar seu agendamento para consultas e exames gratuitos me envie seu nome completo e qual sua cidade, que eu já deixo seu exame gratuito reservado!"
 1.1. ATENÇÃO — RESPOSTA PARCIAL: se você pediu "nome e cidade" junto e a pessoa só respondeu UMA das duas coisas (por exemplo só disse a cidade, ou só o nome), NÃO prossiga como se tivesse as duas. Pergunte especificamente pela informação que ainda falta (ex: "Show, e qual é o seu nome completo?") antes de continuar. Só avance no agendamento quando tiver as duas coisas confirmadas de verdade.
-2. Assim que souber o NOME e a CIDADE da pessoa, veja se ela tem horários na lista HORÁRIOS DISPONÍVEIS PARA AGENDAR abaixo. Se tiver, NÃO pergunte qual período ou horário ela prefere — escolha você mesma o primeiro horário ainda disponível daquele dia/cidade (ordem: 08:00, 09:00, 10:00, 14:00, 15:00, 16:00, pulando os que já estiverem em ${VAGAS_POR_HORARIO}/${VAGAS_POR_HORARIO} vagas) e JÁ CONFIRME o agendamento direto nesse horário, na mesma mensagem em que souber nome+cidade, usando a marcação ###AGENDAR### (regras completas mais abaixo). Isso agiliza o atendimento — não precisa perguntar manhã ou tarde nem nada antes, só agenda direto assim que tiver nome e cidade. Se DEPOIS de já confirmado a pessoa disser que não consegue nesse dia/horário, aí sim pergunte se prefere manhã ou tarde (ou horário específico) e troque usando ###REAGENDAR### (regra 3 mais abaixo). Se a cidade dela NÃO tiver nenhum horário na lista, pense em quais cidades/distritos da lista HORÁRIOS DISPONÍVEIS ficam GEOGRAFICAMENTE PRÓXIMOS da cidade ou região que ela mencionou (use seu conhecimento de geografia do Brasil — a maioria das cidades ativas hoje fica na região de Itaituba/Trairão/Rurópolis, no oeste do Pará, ao longo da BR-163/Transamazônica) e responda citando ESPECIFICAMENTE essa(s) cidade(s) mais próxima(s) dela, nesse estilo: "Nessa cidade não temos atendimento no momento, mas aqui perto, em [cidade(s)/distrito(s) mais próximos], sim! Consegue se deslocar até lá?" Se você não souber ou não tiver certeza de qual fica mais perto, aí sim liste todas as cidades que estão na lista de horários e pergunte se alguma delas é viável pra ela. Nunca invente data, horário ou cidade que não esteja na lista. ISSO VALE MESMO SE a cidade aparecer na lista LOCAL DE ATENDIMENTO POR CIDADE (endereços) — o endereço cadastrado NÃO significa que tem horário ativo agora. O que importa é só a lista HORÁRIOS DISPONÍVEIS PARA AGENDAR: se a cidade que a pessoa disse não tiver NENHUMA linha lá, é porque não tem atendimento ativo pra ela agora, mesmo que já tenha tido antes — não confirme nenhum agendamento nesse caso, use a resposta de "não temos atendimento no momento".
+2. Assim que souber o NOME e a CIDADE da pessoa, veja se ela tem horários na lista HORÁRIOS DISPONÍVEIS PARA AGENDAR abaixo. Se tiver, NÃO pergunte qual período ou horário ela prefere — escolha você mesma o primeiro registro ainda disponível do dia/cidade prioritário (pulando os que já estiverem em ${VAGAS_POR_HORARIO}/${VAGAS_POR_HORARIO} vagas) e JÁ CONFIRME o agendamento, na mesma mensagem em que souber nome+cidade, usando a marcação ###AGENDAR### (regras completas mais abaixo). IMPORTANTE: o horário do registro serve apenas para controle interno; para a pessoa, o atendimento NÃO tem hora marcada e acontece POR ORDEM DE CHEGADA. Se ela pedir ou tentar escolher um horário específico, explique de forma curta e clara que o atendimento é por ordem de chegada e não prometa reserva de hora. Se DEPOIS de confirmado ela disser que não consegue nesse dia, ofereça outro DIA disponível, mantendo a prioridade definida para a cidade, e troque usando ###REAGENDAR###. Se a cidade dela NÃO tiver nenhum horário na lista, pense em quais cidades/distritos da lista HORÁRIOS DISPONÍVEIS ficam GEOGRAFICAMENTE PRÓXIMOS da cidade ou região que ela mencionou (use seu conhecimento de geografia do Brasil — a maioria das cidades ativas hoje fica na região de Itaituba/Trairão/Rurópolis, no oeste do Pará, ao longo da BR-163/Transamazônica) e responda citando ESPECIFICAMENTE essa(s) cidade(s) mais próxima(s) dela, nesse estilo: "Nessa cidade não temos atendimento no momento, mas aqui perto, em [cidade(s)/distrito(s) mais próximos], sim! Consegue se deslocar até lá?" Se você não souber ou não tiver certeza de qual fica mais perto, aí sim liste todas as cidades que estão na lista de horários e pergunte se alguma delas é viável pra ela. Nunca invente data, horário ou cidade que não esteja na lista. ISSO VALE MESMO SE a cidade aparecer na lista LOCAL DE ATENDIMENTO POR CIDADE (endereços) — o endereço cadastrado NÃO significa que tem horário ativo agora. O que importa é só a lista HORÁRIOS DISPONÍVEIS PARA AGENDAR: se a cidade que a pessoa disse não tiver NENHUMA linha lá, é porque não tem atendimento ativo pra ela agora, mesmo que já tenha tido antes — não confirme nenhum agendamento nesse caso, use a resposta de "não temos atendimento no momento".
 2.1. CASO ESPECIAL — OURO PRETO DO OESTE: se a pessoa perguntar sobre atendimento em Ouro Preto do Oeste, responda algo como "Em Ouro Preto do Oeste vamos atender no dia 22 de agosto (sábado), na Clínica Ouro Preto Particular! Vou te passar agora pra uma das nossas atendentes continuar seu atendimento, só um instante 😊" e finalize a resposta com esta marcação EXATA em uma linha separada: ###TRANSFERIR_HUMANO### (essa marcação é invisível pra pessoa, o sistema remove).
 2.1.2. CASO ESPECIAL — ITAITUBA/MORAES DE ALMEIDA: Moraes de Almeida é um distrito de Itaituba-PA. Se a pessoa disser que é de Itaituba (ou da região), NÃO diga que não tem atendimento lá — trate como a mesma cidade "Moraes de Almeida-PA" da lista e ofereça os horários normalmente.
 2.1.3. CASO ESPECIAL — RURÓPOLIS/DIVINÓPOLIS: Divinópolis (Km-70) é um distrito de Rurópolis-PA. Se a pessoa disser que é de Rurópolis (ou da região), NÃO diga que não tem atendimento lá — trate como a mesma cidade "Divinópolis-PA" da lista e ofereça os horários normalmente.
 2.1.5. CASO ESPECIAL — PESSOA DISSE SÓ O ESTADO, SEM CIDADE (ex: "sou do Pará", "moro no Acre"): cidades ativas por estado agora: ${resumoPorEstado || "nenhuma"}. Antes de dizer que não tem atendimento, veja se o estado que ela mencionou está nessa lista. Se estiver, NUNCA diga que não tem atendimento nesse estado — pergunte de qual cidade/região específica dentro do estado ela é, citando as cidades ativas daquele estado como opção (ex: "Legal! No Pará estamos atendendo em Moraes de Almeida, Bela Vista do Caracol, Trairão e Divinópolis — qual dessas fica mais perto de você?"). Só diga que não tem atendimento se o estado dela realmente não tiver nenhuma cidade ativa na lista.
-2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA: os dias 14, 15 e 16 de setembro já estão com a agenda cheia (esses três dias já foram removidos da lista de horários disponíveis, então nem vão aparecer pra você). A partir de agora, pra gente NOVA em Moraes de Almeida, SÓ existe o dia 17 de setembro — escolha e confirme direto num horário do dia 17, sem perguntar qual dia ela prefere. NUNCA diga pra pessoa que os dias 14, 15 ou 16 estão cheios/lotados/esgotados — apenas ofereça o dia 17 normalmente, sem mencionar lotação.
+2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA (PRIORIDADE TOTAL DA CAMPANHA): para TODA pessoa NOVA, agende diretamente no dia 16 de setembro. Não pergunte qual dia ela prefere, não ofereça o dia 17 junto e não mencione outra data enquanto ela não recusar o dia 16. O dia 17 é SOMENTE alternativa: só ofereça e agende no dia 17 se a própria pessoa disser claramente que não consegue comparecer no dia 16. No dia 17, existem vagas novas SOMENTE À TARDE; nunca agende pessoa nova pela manhã nesse dia. Nos dois dias não existe hora marcada: informe que o atendimento é por ordem de chegada. Se a pessoa pedir horário específico, explique isso e mantenha apenas a reserva do dia.
 2.1.6. CASO ESPECIAL — DIVINÓPOLIS-PA: para pessoas NOVAS existe SOMENTE o dia 23 de setembro (o dia 22 não está mais disponível e nem vai aparecer na lista de horários) — escolha e confirme direto num horário do dia 23, sem perguntar qual dia ela prefere. NUNCA diga que o dia 22 está cheio/lotado/esgotado — apenas ofereça o dia 23 normalmente, sem mencionar o dia 22.
 2.1.7. CASO ESPECIAL — TRAIRÃO-PA: para pessoas NOVAS, agende SOMENTE no dia 21 de setembro — escolha e confirme direto num horário do dia 21, sem perguntar qual dia ela prefere e sem mencionar o dia 20 como opção. O dia 20 de setembro é EXCEÇÃO: só ofereça (e agende) o dia 20 se a própria pessoa disser que NÃO consegue de jeito nenhum no dia 21 (ex: "só posso no domingo"). Nunca diga que o dia 20 está cheio ou indisponível — apenas não ofereça, a menos que a pessoa diga que só consegue nesse dia.
-2.2. LIMITE DE VAGAS: cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas. Se TODOS os horários redondos daquele período (manhã: 08:00, 09:00, 10:00 / tarde: 14:00, 15:00, 16:00) já estiverem em ${VAGAS_POR_HORARIO}/${VAGAS_POR_HORARIO}, escolha sozinha um horário fora dos redondos mas dentro da mesma janela (manhã entre 08:00 e 12:00, tarde entre 14:00 e 18:00) que ainda não esteja cheio, e confirme nele do mesmo jeito — sem perguntar, você decide.
-3. Se, DEPOIS de você já ter confirmado um horário, a pessoa disser que esse horário não vai dar mais pra ela, aí sim pergunte "certo, qual horário fica melhor pra você?" oferecendo a janela ampla daquele período pra ela escolher (manhã: entre 08:00 e 12:00 / tarde: entre 14:00 e 18:00). Quando ela escolher, use a marcação ###REAGENDAR### pra trocar o horário anterior por esse novo, como descrito nas REGRAS DO AGENDAMENTO abaixo.
+2.2. DISTRIBUIÇÃO OBRIGATORIAMENTE IGUAL ENTRE MANHÃ E TARDE: divida sempre o total do dia/cidade igualmente entre os dois períodos. Exemplos: 30 pessoas = 15 de manhã e 15 à tarde; 60 = 30 e 30; 100 = 50 e 50. Se o total for ímpar, a diferença máxima permitida é uma pessoa (ex: 31 = 16/15). O sistema já ordena a lista colocando primeiro o período e o horário com menos pessoas e também corrige a escolha antes de salvar. Escolha SEMPRE o primeiro horário visível da lista. Não pergunte qual período a pessoa prefere antes de confirmar. Cada horário individual tem no máximo ${VAGAS_POR_HORARIO} vagas. A única exceção é quando uma regra específica fecha um período inteiro, como a manhã do dia 17 em Moraes de Almeida.
+3. Se, DEPOIS de você já ter confirmado, a pessoa disser que não consegue comparecer naquele dia, pergunte qual outro DIA disponível fica melhor. Não ofereça nem confirme horário específico, pois o atendimento é por ordem de chegada. Quando ela escolher outro dia, use a marcação ###REAGENDAR### pra trocar o registro anterior pelo novo, como descrito nas REGRAS DO AGENDAMENTO abaixo.
 3.1. NUNCA descarte ou desanime a pessoa por causa de horário. Sempre que for usar um horário fora dos horários redondos da lista (seja porque os redondos encheram, seja porque a pessoa pediu um horário específico depois de recusar o primeiro), a marcação ###AGENDAR### ou ###REAGENDAR### tem que usar EXATAMENTE o texto de um horário daquele mesmo dia/cidade que já está na lista HORÁRIOS DISPONÍVEIS, só trocando a parte final "às HH:MM" — nunca mude a data, o ano, a cidade nem a ordem das palavras, e nunca invente um ano diferente do que está na lista (a lista não tem ano, então você também não escreve ano nenhum).
 4. Tirar qualquer dúvida sobre o atendimento usando SOMENTE as informações abaixo.
 5. Conduzir com jeitinho para AGENDAR o exame gratuito.
 6. Para agendar você precisa de: NOME completo da pessoa e o HORÁRIO (data/cidade) escolhido da lista abaixo. NUNCA gere a marcação ###AGENDAR### sem ter o nome completo REAL da pessoa — nunca use um nome genérico ou placeholder tipo "Usuário do WhatsApp". Se em algum momento você for confirmar um horário (inclusive no fluxo automático da regra 2) e ainda não sabe o nome dela, PARE e peça o nome primeiro, só confirme depois que ela responder.
 6.1. REGRA DE OURO, NUNCA ESQUEÇA: toda vez que você escrever uma mensagem confirmando um horário pra pessoa (com data e horário em *negrito*, tipo "já deixei reservado...", "confirmado para..."), essa MESMA resposta TEM que incluir a marcação ###AGENDAR### ou ###REAGENDAR### (conforme o caso), sem exceção. Nunca escreva um texto de confirmação sem a marcação correspondente — se você confirmar sem marcar, o agendamento não fica salvo em lugar nenhum e a pessoa fica sem vaga de verdade.
+6.2. FAMÍLIA NO MESMO HORÁRIO: quando a pessoa agendar dois ou mais familiares juntos na mesma conversa, use exatamente o MESMO horário interno para todas as marcações ###AGENDAR### desse grupo. Nunca separe familiares entre manhã e tarde nem entre horários diferentes. Gere uma marcação separada para cada nome, mas repita o mesmo valor no campo "horario" de todas elas.
 7. Este canal é SOMENTE para agendamento e dúvidas sobre o exame. Se a pessoa mandar qualquer assunto fora disso, diga educadamente que por aqui você só consegue ajudar com o agendamento do exame gratuito, e volte a pedir nome e cidade.
 
 INFORMAÇÕES DA EMPRESA (use só isso, não invente):
@@ -443,8 +513,8 @@ ${Object.entries(CFG.ENDERECOS_POR_CIDADE).map(([cidade, endereco]) => `- ${cida
 - Se a cidade da pessoa não estiver nessa lista acima, diga: "${CFG.ENDERECO}"
 - NUNCA invente nome de escola, igreja, rua, bairro ou qualquer detalhe de endereço que não esteja EXATAMENTE escrito na lista acima. Se a pessoa disser um nome de local diferente (tipo "não é ali, é em tal lugar"), NÃO concorde nem confirme esse local — diga que vai verificar com a equipe e retornar, e nunca repita de volta um nome de local que a própria pessoa disse sem ele estar na lista.
 
-HORÁRIOS DISPONÍVEIS PARA AGENDAR (só datas futuras — o que já passou ou é hoje já foi removido daqui automaticamente; cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas):
-${horariosAtivos.length ? horariosAtivos.map((h) => `- ${h} (${contagemPorHorario[h] || 0}/${VAGAS_POR_HORARIO} vagas preenchidas)`).join("\n") : "Nenhum horário disponível no momento — todas as datas já passaram."}
+HORÁRIOS DISPONÍVEIS PARA AGENDAR (ordenados automaticamente do período/horário menos ocupado para o mais ocupado; escolha sempre o primeiro registro do dia/cidade correto):
+${horariosAtivos.length ? horariosAtivos.map((h) => `- ${h} (${contagemPorHorario[h] || 0}/${VAGAS_POR_HORARIO} neste horário; ${contagemDoPeriodo(todosAgendamentos, h)} no período)`).join("\n") : "Nenhum horário disponível no momento — todas as datas passaram ou os horários atingiram a capacidade."}
 
 AGENDAMENTOS JÁ FEITOS POR ESSE CONTATO (mesmo número de WhatsApp):
 ${agendamentosContato.length ? agendamentosContato.map((a) => `- ${a.nome}: ${a.horario}`).join("\n") : "Nenhum agendamento anterior encontrado pra esse contato."}
@@ -460,7 +530,7 @@ REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 - Essa marcação é invisível pra pessoa (o sistema remove). Use UMA marcação ###AGENDAR### pra cada pessoa que está sendo agendada — se a pessoa estiver marcando pra mais de uma (ex: ela e o filho), coloque uma marcação ###AGENDAR### separada pra cada uma, cada uma em sua própria linha, todas na mesma resposta.
 - Na mesma mensagem, diga de forma calorosa que o exame está reservado e que é gratuito. NÃO escreva a data, o horário específico nem o nome do local/endereço nessa mensagem — o sistema adiciona automaticamente a data, o horário e o endereço certos logo em seguida, então você só precisa confirmar de forma simpática (tipo "Prontinho! Já deixei seu exame gratuito reservado, veja os detalhes abaixo:") e lembrar de levar documento com foto.
 - Logo depois de confirmar (mesma mensagem, parágrafo seguinte), pergunte se ela quer agendar pra mais algum familiar também, tipo "Quer agendar pra mais algum familiar também?". NÃO mande o convite de compartilhar o link nessa mesma mensagem — espere a resposta dela primeiro.
-- Se ela quiser agendar mais alguém da família, siga o fluxo normal (pegue nome e período da pessoa nova) e confirme com uma marcação ###AGENDAR### pra ela também.
+- Se ela quiser agendar mais alguém da família, peça somente o nome completo da pessoa nova e confirme com uma marcação ###AGENDAR### usando EXATAMENTE o mesmo horário do agendamento já existente desse contato. Não pergunte período e não escolha outro horário.
 - Se ela disser que NÃO quer agendar mais ninguém da família, aí sim convide ela a compartilhar o link com amigos e parentes, mais ou menos assim: "Pedimos por gentileza que compartilhe nosso link de agendamento com amigos e familiares para que possam participar também: 👇🏻 https://wa.me/message/ZQKGY2AQYXRKA1" — pode ajustar o texto pra soar natural, mas SEMPRE inclua esse link exatamente como está.
 - Se a pessoa pedir algo que você não sabe, diga que vai verificar com a equipe e que já retornam.
 - Se perguntarem sobre óculos: deixe claro que o atendimento gratuito é SOMENTE o exame de vista — o projeto não fabrica nem entrega óculos, nem no mesmo dia nem depois. Mas pode informar que no dia do atendimento tem uma ótica presente no local, caso a pessoa queira comprar óculos por conta própria (isso é totalmente à parte, opcional, e não tem nenhuma relação com o exame gratuito). Nunca diga que o projeto entrega, fabrica ou garante óculos no mesmo dia.`;
@@ -541,17 +611,31 @@ function nomeValido(nome) {
 // mesmo ainda sendo data futura. Atualizar aqui conforme a equipe avisar de novas lotações.
 const STEMS_FECHADOS_PARA_NOVOS = [
   "Segunda-feira 14 de setembro em Moraes de Almeida-PA",
-  "Terça-feira 15 de setembro em Moraes de Almeida-PA",
-  "Quarta-feira 16 de setembro em Moraes de Almeida-PA",
   "Terça-feira 22 de setembro em Divinópolis-PA",
 ];
 
-function horarioFechadoParaNovos(horario) {
-  const semHora = (horario || "").replace(/às\s*\d{2}:\d{2}/i, "").trim();
-  return STEMS_FECHADOS_PARA_NOVOS.includes(semHora);
+const PERIODOS_FECHADOS_PARA_NOVOS = [
+  {
+    stem: "Quinta-feira 17 de setembro em Moraes de Almeida-PA",
+    periodo: "manhã",
+  },
+];
+
+function atendimentoPorOrdemDeChegada(horario) {
+  return /(?:Terça-feira 15|Quarta-feira 16|Quinta-feira 17) de setembro em Moraes de Almeida-PA/i.test(
+    horario || ""
+  );
 }
 
-function horarioValido(horario) {
+function horarioFechadoParaNovos(horario) {
+  const semHora = stemDoHorario(horario);
+  if (STEMS_FECHADOS_PARA_NOVOS.includes(semHora)) return true;
+  return PERIODOS_FECHADOS_PARA_NOVOS.some(
+    (item) => item.stem === semHora && item.periodo === periodoDoHorario(horario)
+  );
+}
+
+function horarioValido(horario, agendamentos = carregarAgendamentos()) {
   const texto = (horario || "").trim();
   if (!texto) return false;
   const semHora = texto.replace(/às\s*\d{2}:\d{2}/i, "").trim();
@@ -559,6 +643,7 @@ function horarioValido(horario) {
   if (!baseReal) return false;
   if (horarioFechadoParaNovos(texto)) return false;
   if (horarioJaPassou(texto)) return false;
+  if (!horarioComCapacidade(texto, agendamentos)) return false;
   return true;
 }
 
@@ -586,11 +671,44 @@ function processarResposta(textoIA, jid) {
   }
 
   const marca = /###AGENDAR###\s*(\{[\s\S]*?\})/g;
-  for (const m of [...texto.matchAll(marca)]) {
+  const marcacoesAgendar = [...texto.matchAll(marca)];
+  const quantidadePorStem = new Map();
+  for (const m of marcacoesAgendar) {
+    try {
+      const dados = JSON.parse(m[1]);
+      const stem = stemDoHorario(normalizarHorario(dados.horario));
+      quantidadePorStem.set(stem, (quantidadePorStem.get(stem) || 0) + 1);
+    } catch {}
+  }
+  const horarioCompartilhadoPorStem = new Map();
+  const stemsComHorarioFamiliar = new Set();
+
+  for (const m of marcacoesAgendar) {
     try {
       const dados = JSON.parse(m[1]);
       const telefone = resolverTelefone(jid);
-      const horario = normalizarHorario(dados.horario);
+      const horarioSolicitado = normalizarHorario(dados.horario);
+      const stem = stemDoHorario(horarioSolicitado);
+      const quantidadeDoGrupo = quantidadePorStem.get(stem) || 1;
+      if (!horarioCompartilhadoPorStem.has(stem)) {
+        const agendamentosAtuais = carregarAgendamentos();
+        const horarioDaFamilia = agendamentosAtuais.find(
+          (a) =>
+            telefonesEquivalentes(a.telefone, telefone) &&
+            stemDoHorario(a.horario) === stem
+        )?.horario;
+        if (horarioDaFamilia) stemsComHorarioFamiliar.add(stem);
+        horarioCompartilhadoPorStem.set(
+          stem,
+          horarioDaFamilia ||
+            escolherHorarioEquilibrado(
+              horarioSolicitado,
+              agendamentosAtuais,
+              quantidadeDoGrupo
+            )
+        );
+      }
+      const horario = horarioCompartilhadoPorStem.get(stem);
       const JANELA_DUPLICADO_MS = 24 * 60 * 60 * 1000;
       const jaExiste = carregarAgendamentos().some(
         (a) =>
@@ -599,6 +717,15 @@ function processarResposta(textoIA, jid) {
           a.nome === dados.nome &&
           Date.now() - new Date(a.criadoEm).getTime() < JANELA_DUPLICADO_MS
       );
+      const agendamentosParaValidar = stemsComHorarioFamiliar.has(stem)
+        ? carregarAgendamentos().filter(
+            (a) =>
+              !(
+                telefonesEquivalentes(a.telefone, telefone) &&
+                stemDoHorario(a.horario) === stem
+              )
+          )
+        : carregarAgendamentos();
       if (!nomeValido(dados.nome)) {
         console.error(
           "⚠️ Agendamento BLOQUEADO — nome inválido/placeholder:",
@@ -608,7 +735,7 @@ function processarResposta(textoIA, jid) {
           "| horario:",
           horario
         );
-      } else if (!horarioValido(horario)) {
+      } else if (!horarioValido(horario, agendamentosParaValidar)) {
         console.error(
           "⚠️ Agendamento BLOQUEADO — horário inválido, inexistente ou já expirado:",
           JSON.stringify(horario),
@@ -640,8 +767,15 @@ function processarResposta(textoIA, jid) {
       const dados = JSON.parse(m[1]);
       const telefone = resolverTelefone(jid);
       const horarioAntigo = normalizarHorario(dados.horarioAntigo);
-      const horarioNovo = normalizarHorario(dados.horarioNovo);
-      if (!nomeValido(dados.nome) || !horarioValido(horarioNovo)) {
+      const agendamentosSemOAntigo = carregarAgendamentos().filter(
+        (a) => !(telefonesEquivalentes(a.telefone, telefone) && a.horario === horarioAntigo)
+      );
+      const horarioNovoSolicitado = normalizarHorario(dados.horarioNovo);
+      const horarioNovo = escolherHorarioEquilibrado(
+        horarioNovoSolicitado,
+        agendamentosSemOAntigo
+      );
+      if (!nomeValido(dados.nome) || !horarioValido(horarioNovo, agendamentosSemOAntigo)) {
         console.error(
           "⚠️ Reagendamento BLOQUEADO — nome ou horário novo inválido:",
           JSON.stringify(dados.nome),
@@ -678,6 +812,9 @@ function processarResposta(textoIA, jid) {
       const endereco = CFG.ENDERECOS_POR_CIDADE[extrairCidade(horario)];
       if (endereco) enderecosUnicos.add(endereco);
       const prefixoNome = confirmacoes.length > 1 ? `👤 *${nome}*: ` : "";
+      if (atendimentoPorOrdemDeChegada(horario)) {
+        return `${prefixoNome}📅 *${data}*\n🕐 Atendimento por ordem de chegada (sem horário marcado)`;
+      }
       return `${prefixoNome}📅 *${data}*, às *${hora}*`;
     });
     if (enderecosUnicos.size > 0) {
