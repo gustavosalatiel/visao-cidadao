@@ -534,6 +534,41 @@ function escolherHorarioEquilibrado(horarioSolicitado, agendamentos, quantidade 
   return ordenarHorariosEquilibrados(candidatos, agendamentos)[0] || horarioSolicitado;
 }
 
+function clienteRecusouDia16EmMoraes(jid) {
+  const mensagensCliente = (historicos.get(jid) || [])
+    .filter((m) => m.role === "cliente")
+    .slice(-4)
+    .map((m) =>
+      (m.text || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+    );
+  return mensagensCliente.some(
+    (texto) =>
+      /(?:nao\s+(?:consigo|posso|da|vou)|impossivel|so\s+(?:posso|consigo)|prefiro)/.test(texto) &&
+      /(?:hoje|dia\s*16|quarta|amanha|dia\s*17|quinta)/.test(texto)
+  );
+}
+
+function aplicarPrioridadeMoraesDia16(horarioSolicitado, jid) {
+  const stemDia17 = "Quinta-feira 17 de setembro em Moraes de Almeida-PA";
+  if (
+    stemDoHorario(horarioSolicitado) !== stemDia17 ||
+    clienteRecusouDia16EmMoraes(jid)
+  ) {
+    return horarioSolicitado;
+  }
+
+  const horarioDia16 = CFG.HORARIOS.find(
+    (h) => stemDoHorario(h) === "Quarta-feira 16 de setembro em Moraes de Almeida-PA"
+  );
+  if (horarioDia16) {
+    console.log("📌 Prioridade aplicada: agendamento de Moraes redirecionado do dia 17 para o dia 16.");
+  }
+  return horarioDia16 || horarioSolicitado;
+}
+
 function promptSistema(jid) {
   const telefone = resolverTelefone(jid);
   const todosAgendamentos = carregarAgendamentos();
@@ -805,7 +840,10 @@ function processarResposta(textoIA, jid) {
     try {
       const dados = JSON.parse(m[1]);
       const telefone = resolverTelefone(jid);
-      const horarioSolicitado = normalizarHorario(dados.horario);
+      const horarioSolicitado = aplicarPrioridadeMoraesDia16(
+        normalizarHorario(dados.horario),
+        jid
+      );
       const stem = stemDoHorario(horarioSolicitado);
       const quantidadeDoGrupo = quantidadePorStem.get(stem) || 1;
       if (!horarioCompartilhadoPorStem.has(stem)) {
@@ -888,7 +926,10 @@ function processarResposta(textoIA, jid) {
       const agendamentosSemOAntigo = carregarAgendamentos().filter(
         (a) => !(telefonesEquivalentes(a.telefone, telefone) && a.horario === horarioAntigo)
       );
-      const horarioNovoSolicitado = normalizarHorario(dados.horarioNovo);
+      const horarioNovoSolicitado = aplicarPrioridadeMoraesDia16(
+        normalizarHorario(dados.horarioNovo),
+        jid
+      );
       const horarioNovo = escolherHorarioEquilibrado(
         horarioNovoSolicitado,
         agendamentosSemOAntigo
