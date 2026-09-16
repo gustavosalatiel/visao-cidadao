@@ -6,7 +6,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node --env-file-if-exists=.env index.js"
+    "start": "node --env-file-if-exists=.env index.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc14",

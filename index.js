@@ -569,6 +569,88 @@ function aplicarPrioridadeMoraesDia16(horarioSolicitado, jid) {
   return horarioDia16 || horarioSolicitado;
 }
 
+function normalizarBusca(texto) {
+  return (texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function apelidosDaCidade(cidade) {
+  const normalizada = normalizarBusca(cidade.replace(/-[A-Z]{2}$/i, ""));
+  if (normalizada.includes("moraes de almeida")) return ["moraes de almeida", "moraes"];
+  if (normalizada.includes("bela vista do caracol")) return ["bela vista do caracol", "bela vista", "caracol"];
+  if (normalizada.includes("trairao")) return ["trairao"];
+  if (normalizada.includes("divinopolis")) return ["divinopolis", "km 70", "km-70"];
+  return [normalizada];
+}
+
+function historicoConfirmaDeslocamento(mensagens, cidade) {
+  const alvos = apelidosDaCidade(cidade);
+  mensagens = (mensagens || []).slice(-14);
+
+  for (let i = mensagens.length - 1; i >= 0; i--) {
+    const atual = mensagens[i];
+    if (atual.role !== "cliente") continue;
+    const resposta = normalizarBusca(atual.text);
+    if (/\b(?:nao consigo|nao posso|nao vou|longe demais|muito longe|nao da)\b/.test(resposta)) continue;
+
+    const confirmouDireto =
+      alvos.some((alvo) => resposta.includes(alvo)) &&
+      /\b(?:consigo|posso|vou|aceito|quero|pode marcar|pode agendar)\b/.test(resposta);
+    if (confirmouDireto) return true;
+
+    const anterior = mensagens[i - 1];
+    if (!anterior || anterior.role !== "atendente") continue;
+    const pergunta = normalizarBusca(anterior.text);
+    const perguntouSobreLocal =
+      alvos.some((alvo) => pergunta.includes(alvo)) &&
+      /\b(?:consegue|pode ir|comparecer|deslocar|fica viavel|qual dessas)\b/.test(pergunta);
+    const cidadesMencionadas = CIDADES_CONHECIDAS.filter((cidadeConhecida) =>
+      apelidosDaCidade(cidadeConhecida).some((apelido) => pergunta.includes(apelido))
+    ).length;
+    const escolheuCidade = alvos.some((alvo) => resposta.includes(alvo));
+    const respostaAfirmativa =
+      (/^(?:sim|consigo|posso|vou|pode|ok|combinado|quero)(?:\b|[!,.;])/.test(resposta) &&
+        (cidadesMencionadas <= 1 || escolheuCidade)) ||
+      escolheuCidade;
+    if (perguntouSobreLocal && respostaAfirmativa) return true;
+  }
+  return false;
+}
+
+function clienteConfirmouDeslocamento(jid, cidade) {
+  return historicoConfirmaDeslocamento(historicos.get(jid) || [], cidade);
+}
+
+function contatoJaConfirmadoNaCidade(jid, cidade) {
+  const telefone = resolverTelefone(jid);
+  return carregarAgendamentos().some(
+    (a) => telefonesEquivalentes(a.telefone, telefone) && extrairCidade(a.horario) === cidade
+  );
+}
+
+function perguntaConfirmacaoDeLocal(cidade) {
+  const endereco = CFG.ENDERECOS_POR_CIDADE[cidade];
+  const datas = [
+    ...new Set(
+      CFG.HORARIOS.filter(
+        (h) =>
+          extrairCidade(h) === cidade &&
+          !horarioJaPassou(h) &&
+          !horarioFechadoParaNovos(h) &&
+          horarioComCapacidade(h, carregarAgendamentos())
+      ).map((h) => stemDoHorario(h).replace(/\s+(?:em|no|na)\s+.+$/i, ""))
+    ),
+  ];
+  const quando = datas.length ? ` em *${datas.join(" ou ")}*` : "";
+  const onde = endereco ? `, no endereço *${endereco}*` : "";
+  return (
+    `Antes de reservar, preciso confirmar o local: o atendimento será em *${cidade}*${quando}${onde}. ` +
+    `Você consegue se deslocar e comparecer nesse local?`
+  );
+}
+
 function promptSistema(jid) {
   const telefone = resolverTelefone(jid);
   const todosAgendamentos = carregarAgendamentos();
@@ -613,17 +695,17 @@ SUA PERSONALIDADE:
 
 SEU OBJETIVO:
 0. IMPORTANTE — MEMÓRIA: o histórico de mensagens abaixo é permanente, mesmo que a última conversa tenha sido há dias ou semanas. Se o nome da pessoa já aparece em mensagens anteriores no histórico, você JÁ CONHECE essa pessoa — chame ela pelo nome desde a primeira resposta e NÃO peça nome/cidade de novo (só pergunte de novo se for pra um NOVO agendamento e o horário anterior já passou). Trate isso como se você realmente lembrasse da pessoa.
-1. Se for a primeira conversa (nome não aparece no histórico), seja direta desde a primeira mensagem: dê boas-vindas e já peça o nome completo e a cidade da pessoa para reservar o exame gratuito. Não pergunte como a pessoa está se sentindo nem faça perguntas exploratórias. Exemplo de abertura: "Oi! Aqui é do projeto Visão Cidadão 😊 para realizar seu agendamento para consultas e exames gratuitos me envie seu nome completo e qual sua cidade, que eu já deixo seu exame gratuito reservado!"
+1. Se for a primeira conversa (nome não aparece no histórico), seja direta: dê boas-vindas e peça nome completo e cidade para verificar os locais de atendimento disponíveis. Não prometa reserva antes de confirmar o local. Exemplo: "Oi! Aqui é do projeto Visão Cidadão 😊 Me envie seu nome completo e sua cidade para eu verificar onde teremos atendimento gratuito mais perto de você."
 1.1. ATENÇÃO — RESPOSTA PARCIAL: se você pediu "nome e cidade" junto e a pessoa só respondeu UMA das duas coisas (por exemplo só disse a cidade, ou só o nome), NÃO prossiga como se tivesse as duas. Pergunte especificamente pela informação que ainda falta (ex: "Show, e qual é o seu nome completo?") antes de continuar. Só avance no agendamento quando tiver as duas coisas confirmadas de verdade.
-2. Assim que souber o NOME e a CIDADE da pessoa, veja se ela tem horários na lista HORÁRIOS DISPONÍVEIS PARA AGENDAR abaixo. Se tiver, NÃO pergunte qual período ou horário ela prefere — escolha você mesma o primeiro registro ainda disponível do dia/cidade prioritário (pulando os que já estiverem em ${VAGAS_POR_HORARIO}/${VAGAS_POR_HORARIO} vagas) e JÁ CONFIRME o agendamento, na mesma mensagem em que souber nome+cidade, usando a marcação ###AGENDAR### (regras completas mais abaixo). IMPORTANTE: o horário do registro serve apenas para controle interno; para a pessoa, o atendimento NÃO tem hora marcada e acontece POR ORDEM DE CHEGADA. Se ela pedir ou tentar escolher um horário específico, explique de forma curta e clara que o atendimento é por ordem de chegada e não prometa reserva de hora. Se DEPOIS de confirmado ela disser que não consegue nesse dia, ofereça outro DIA disponível, mantendo a prioridade definida para a cidade, e troque usando ###REAGENDAR###. Se a cidade dela NÃO tiver nenhum horário na lista, pense em quais cidades/distritos da lista HORÁRIOS DISPONÍVEIS ficam GEOGRAFICAMENTE PRÓXIMOS da cidade ou região que ela mencionou (use seu conhecimento de geografia do Brasil — a maioria das cidades ativas hoje fica na região de Itaituba/Trairão/Rurópolis, no oeste do Pará, ao longo da BR-163/Transamazônica) e responda citando ESPECIFICAMENTE essa(s) cidade(s) mais próxima(s) dela, nesse estilo: "Nessa cidade não temos atendimento no momento, mas aqui perto, em [cidade(s)/distrito(s) mais próximos], sim! Consegue se deslocar até lá?" Se você não souber ou não tiver certeza de qual fica mais perto, aí sim liste todas as cidades que estão na lista de horários e pergunte se alguma delas é viável pra ela. Nunca invente data, horário ou cidade que não esteja na lista. ISSO VALE MESMO SE a cidade aparecer na lista LOCAL DE ATENDIMENTO POR CIDADE (endereços) — o endereço cadastrado NÃO significa que tem horário ativo agora. O que importa é só a lista HORÁRIOS DISPONÍVEIS PARA AGENDAR: se a cidade que a pessoa disse não tiver NENHUMA linha lá, é porque não tem atendimento ativo pra ela agora, mesmo que já tenha tido antes — não confirme nenhum agendamento nesse caso, use a resposta de "não temos atendimento no momento".
+2. CONFIRMAÇÃO OBRIGATÓRIA DO LOCAL ANTES DE AGENDAR: assim que souber NOME e CIDADE, NUNCA agende imediatamente. Primeiro informe com clareza a CIDADE/DISTRITO EXATO onde o atendimento acontecerá, a data e o endereço cadastrado, e pergunte: "Você consegue se deslocar e comparecer nesse local?". Só gere ###AGENDAR### depois que a pessoa responder explicitamente que SIM, que CONSEGUE ou que PODE IR àquele local. O servidor bloqueia qualquer agendamento sem essa confirmação. Se a cidade onde ela mora tiver atendimento ativo, confirme o próprio local da mesma forma antes de reservar. Se a cidade dela NÃO tiver atendimento ativo, não escolha uma cidade por conta própria: apresente as cidades/distritos que realmente aparecem em HORÁRIOS DISPONÍVEIS, começando pelas mais próximas quando tiver certeza, e pergunte em qual delas ela consegue ir. Se houver mais de uma opção e ela responder apenas "sim", pergunte QUAL cidade; não agende até ela escolher. Quando ela escolher uma cidade, repita o local/data/endereço e confirme que ela consegue comparecer. Nunca use "cidade mais próxima" como autorização automática e nunca presuma que a pessoa consegue viajar. Depois do aceite explícito, escolha o primeiro registro disponível da cidade confirmada, sem perguntar período ou horário. O horário é apenas controle interno; para a pessoa o atendimento é POR ORDEM DE CHEGADA.
 2.1. CASO ESPECIAL — OURO PRETO DO OESTE: se a pessoa perguntar sobre atendimento em Ouro Preto do Oeste, responda algo como "Em Ouro Preto do Oeste vamos atender no dia 22 de agosto (sábado), na Clínica Ouro Preto Particular! Vou te passar agora pra uma das nossas atendentes continuar seu atendimento, só um instante 😊" e finalize a resposta com esta marcação EXATA em uma linha separada: ###TRANSFERIR_HUMANO### (essa marcação é invisível pra pessoa, o sistema remove).
-2.1.2. CASO ESPECIAL — ITAITUBA/MORAES DE ALMEIDA: Moraes de Almeida é um distrito de Itaituba-PA. Se a pessoa disser que é de Itaituba (ou da região), NÃO diga que não tem atendimento lá — trate como a mesma cidade "Moraes de Almeida-PA" da lista e ofereça os horários normalmente.
-2.1.3. CASO ESPECIAL — RURÓPOLIS/DIVINÓPOLIS: Divinópolis (Km-70) é um distrito de Rurópolis-PA. Se a pessoa disser que é de Rurópolis (ou da região), NÃO diga que não tem atendimento lá — trate como a mesma cidade "Divinópolis-PA" da lista e ofereça os horários normalmente.
+2.1.2. CASO ESPECIAL — ITAITUBA/MORAES DE ALMEIDA: Moraes de Almeida é distrito de Itaituba, mas NÃO presuma que quem mora em Itaituba consegue viajar até lá. Diga claramente que o atendimento será em Moraes de Almeida, informe data e endereço e pergunte se consegue se deslocar. Só agende depois do "sim" explícito.
+2.1.3. CASO ESPECIAL — RURÓPOLIS/DIVINÓPOLIS: Divinópolis (Km-70) é distrito de Rurópolis, mas NÃO presuma que quem mora em Rurópolis consegue viajar até lá. Diga claramente que o atendimento será em Divinópolis, informe data e endereço e pergunte se consegue se deslocar. Só agende depois do "sim" explícito.
 2.1.5. CASO ESPECIAL — PESSOA DISSE SÓ O ESTADO, SEM CIDADE (ex: "sou do Pará", "moro no Acre"): cidades ativas por estado agora: ${resumoPorEstado || "nenhuma"}. Antes de dizer que não tem atendimento, veja se o estado que ela mencionou está nessa lista. Se estiver, NUNCA diga que não tem atendimento nesse estado — pergunte de qual cidade/região específica dentro do estado ela é, citando as cidades ativas daquele estado como opção (ex: "Legal! No Pará estamos atendendo em Moraes de Almeida, Bela Vista do Caracol, Trairão e Divinópolis — qual dessas fica mais perto de você?"). Só diga que não tem atendimento se o estado dela realmente não tiver nenhuma cidade ativa na lista.
-2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA (PRIORIDADE TOTAL DA CAMPANHA): para TODA pessoa NOVA, agende diretamente no dia 16 de setembro. Não pergunte qual dia ela prefere, não ofereça o dia 17 junto e não mencione outra data enquanto ela não recusar o dia 16. O dia 17 é SOMENTE alternativa: só ofereça e agende no dia 17 se a própria pessoa disser claramente que não consegue comparecer no dia 16. No dia 17, existem vagas novas SOMENTE À TARDE; nunca agende pessoa nova pela manhã nesse dia. Nos dois dias não existe hora marcada: informe que o atendimento é por ordem de chegada. Se a pessoa pedir horário específico, explique isso e mantenha apenas a reserva do dia.
-2.1.6. CASO ESPECIAL — DIVINÓPOLIS-PA: para pessoas NOVAS existe SOMENTE o dia 23 de setembro (o dia 22 não está mais disponível e nem vai aparecer na lista de horários) — escolha e confirme direto num horário do dia 23, sem perguntar qual dia ela prefere. NUNCA diga que o dia 22 está cheio/lotado/esgotado — apenas ofereça o dia 23 normalmente, sem mencionar o dia 22.
-2.1.7. CASO ESPECIAL — TRAIRÃO-PA: para pessoas NOVAS, agende SOMENTE no dia 21 de setembro — escolha e confirme direto num horário do dia 21, sem perguntar qual dia ela prefere e sem mencionar o dia 20 como opção. O dia 20 de setembro é EXCEÇÃO: só ofereça (e agende) o dia 20 se a própria pessoa disser que NÃO consegue de jeito nenhum no dia 21 (ex: "só posso no domingo"). Nunca diga que o dia 20 está cheio ou indisponível — apenas não ofereça, a menos que a pessoa diga que só consegue nesse dia.
-2.1.8. CASO ESPECIAL — NOVO PROGRESSO-PA: vamos atender em Novo Progresso futuramente, mas a data ainda não foi definida. Se a pessoa disser que é de Novo Progresso, NÃO ofereça outra cidade e NÃO faça agendamento comum. Se ainda não souber o nome completo, diga que haverá atendimento na própria cidade em breve, que avisaremos quando a data for confirmada, e peça o nome completo para colocar na lista de espera. Assim que souber o nome, responda de forma curta e acolhedora, por exemplo: "Perfeito! Vamos atender em Novo Progresso em breve. Deixei seu nome na nossa lista de espera e vamos avisar por aqui assim que a data for confirmada 😊". Finalize com a marcação exata em uma linha separada: ###LISTA_ESPERA_NOVO_PROGRESSO###{"nome":"NOME COMPLETO"}. Essa marcação é invisível para a pessoa. NUNCA use ###AGENDAR### para Novo Progresso enquanto não existir uma data oficial.
+2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA (PRIORIDADE TOTAL DA CAMPANHA): depois que a pessoa confirmar que consegue comparecer em Moraes de Almeida, priorize o dia 16 de setembro. Não ofereça o dia 17 junto. O dia 17 é alternativa apenas se ela disser claramente que não consegue no dia 16; nele, novas vagas são somente à tarde. O atendimento é por ordem de chegada.
+2.1.6. CASO ESPECIAL — DIVINÓPOLIS-PA: existe somente o dia 23 de setembro para pessoas novas. Informe local/data/endereço, confirme se consegue ir e só então agende no dia 23. Não mencione o dia 22.
+2.1.7. CASO ESPECIAL — TRAIRÃO-PA: apresente o atendimento em Trairão e confirme se a pessoa consegue ir. Depois do aceite, priorize o dia 21. O dia 20 é exceção apenas se ela disser que não consegue no dia 21.
+2.1.8. CASO ESPECIAL — NOVO PROGRESSO-PA: vamos atender na própria cidade futuramente, mas ainda não há data. Explique isso e ofereça duas possibilidades: (a) ficar na lista de espera de Novo Progresso para ser avisada quando a data sair; ou (b) verificar as cidades/distritos atualmente ativos para atendimento antecipado. Se escolher esperar e você souber o nome, use ###LISTA_ESPERA_NOVO_PROGRESSO###{"nome":"NOME COMPLETO"}. Se quiser outra cidade, apresente somente locais ativos, pergunte qual consegue ir e só use ###AGENDAR### depois da confirmação explícita de deslocamento. Nunca agende automaticamente Novo Progresso em Moraes de Almeida ou em qualquer outra cidade.
 2.2. DISTRIBUIÇÃO OBRIGATORIAMENTE IGUAL ENTRE MANHÃ E TARDE: divida sempre o total do dia/cidade igualmente entre os dois períodos. Exemplos: 30 pessoas = 15 de manhã e 15 à tarde; 60 = 30 e 30; 100 = 50 e 50. Se o total for ímpar, a diferença máxima permitida é uma pessoa (ex: 31 = 16/15). O sistema já ordena a lista colocando primeiro o período e o horário com menos pessoas e também corrige a escolha antes de salvar. Escolha SEMPRE o primeiro horário visível da lista. Não pergunte qual período a pessoa prefere antes de confirmar. Cada horário individual tem no máximo ${VAGAS_POR_HORARIO} vagas. A única exceção é quando uma regra específica fecha um período inteiro, como a manhã do dia 17 em Moraes de Almeida.
 3. Se, DEPOIS de você já ter confirmado, a pessoa disser que não consegue comparecer naquele dia, pergunte qual outro DIA disponível fica melhor. Não ofereça nem confirme horário específico, pois o atendimento é por ordem de chegada. Quando ela escolher outro dia, use a marcação ###REAGENDAR### pra trocar o registro anterior pelo novo, como descrito nas REGRAS DO AGENDAMENTO abaixo.
 3.1. NUNCA descarte ou desanime a pessoa por causa de horário. Sempre que for usar um horário fora dos horários redondos da lista (seja porque os redondos encheram, seja porque a pessoa pediu um horário específico depois de recusar o primeiro), a marcação ###AGENDAR### ou ###REAGENDAR### tem que usar EXATAMENTE o texto de um horário daquele mesmo dia/cidade que já está na lista HORÁRIOS DISPONÍVEIS, só trocando a parte final "às HH:MM" — nunca mude a data, o ano, a cidade nem a ordem das palavras, e nunca invente um ano diferente do que está na lista (a lista não tem ano, então você também não escreve ano nenhum).
@@ -790,6 +872,7 @@ function formatarDataHora(horario) {
 function processarResposta(textoIA, jid) {
   let texto = textoIA;
   const confirmacoes = [];
+  let localPendenteConfirmacao = null;
 
   const marcaListaEspera = /###LISTA_ESPERA_NOVO_PROGRESSO###\s*(\{[\s\S]*?\})/g;
   const marcacoesListaEspera = [...texto.matchAll(marcaListaEspera)];
@@ -820,6 +903,15 @@ function processarResposta(textoIA, jid) {
       jid,
       "| texto:",
       texto.replace(/\n/g, " ").slice(0, 300)
+    );
+    const textoNormalizado = normalizarBusca(texto);
+    const cidadeMencionada = CIDADES_CONHECIDAS.find((cidade) =>
+      apelidosDaCidade(cidade).some((apelido) => textoNormalizado.includes(apelido))
+    );
+    if (cidadeMencionada) return perguntaConfirmacaoDeLocal(cidadeMencionada);
+    return (
+      "Ainda não concluí a reserva. Antes de agendar, preciso confirmar em qual dos locais " +
+      "de atendimento disponíveis você consegue comparecer."
     );
   }
 
@@ -882,6 +974,10 @@ function processarResposta(textoIA, jid) {
               )
           )
         : carregarAgendamentos();
+      const cidadeDoAtendimento = extrairCidade(horario);
+      const localConfirmado =
+        contatoJaConfirmadoNaCidade(jid, cidadeDoAtendimento) ||
+        clienteConfirmouDeslocamento(jid, cidadeDoAtendimento);
       if (!nomeValido(dados.nome)) {
         console.error(
           "⚠️ Agendamento BLOQUEADO — nome inválido/placeholder:",
@@ -890,6 +986,14 @@ function processarResposta(textoIA, jid) {
           jid,
           "| horario:",
           horario
+        );
+      } else if (!localConfirmado) {
+        localPendenteConfirmacao = cidadeDoAtendimento;
+        console.error(
+          "⚠️ Agendamento BLOQUEADO — cliente ainda não confirmou deslocamento para:",
+          cidadeDoAtendimento,
+          "| jid:",
+          jid
         );
       } else if (!horarioValido(horario, agendamentosParaValidar)) {
         console.error(
@@ -934,7 +1038,19 @@ function processarResposta(textoIA, jid) {
         horarioNovoSolicitado,
         agendamentosSemOAntigo
       );
-      if (!nomeValido(dados.nome) || !horarioValido(horarioNovo, agendamentosSemOAntigo)) {
+      const cidadeNova = extrairCidade(horarioNovo);
+      const confirmouCidadeNova =
+        contatoJaConfirmadoNaCidade(jid, cidadeNova) ||
+        clienteConfirmouDeslocamento(jid, cidadeNova);
+      if (!confirmouCidadeNova) {
+        localPendenteConfirmacao = cidadeNova;
+        console.error(
+          "⚠️ Reagendamento BLOQUEADO — cliente ainda não confirmou deslocamento para:",
+          cidadeNova,
+          "| jid:",
+          jid
+        );
+      } else if (!nomeValido(dados.nome) || !horarioValido(horarioNovo, agendamentosSemOAntigo)) {
         console.error(
           "⚠️ Reagendamento BLOQUEADO — nome ou horário novo inválido:",
           JSON.stringify(dados.nome),
@@ -963,6 +1079,10 @@ function processarResposta(textoIA, jid) {
     }
   }
   texto = texto.replace(marcaReagendar, "").trim();
+
+  if (localPendenteConfirmacao) {
+    return perguntaConfirmacaoDeLocal(localPendenteConfirmacao);
+  }
 
   if (confirmacoes.length > 0) {
     const enderecosUnicos = new Set();
@@ -1669,16 +1789,22 @@ function iniciarServidorHTTP(getSock) {
 }
 
 let sockAtual = null;
-(async () => {
-  console.log("🤖 Iniciando bot com IA...");
-  if (CFG.GEMINI_API_KEY.includes("COLE-SUA-CHAVE")) {
-    console.log("⚠️  ATENÇÃO: configure a GEMINI_API_KEY no config.js!");
-    console.log("   Pegue grátis em: https://aistudio.google.com/apikey\n");
-  }
-  sockAtual = await iniciarBot();
-  iniciarServidorHTTP(() => sockAtual);
-  setInterval(verificarLembretesDeUrgencia, 5 * 60 * 1000);
-})().catch((e) => {
-  console.error("Erro fatal ao iniciar o bot:", e.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  (async () => {
+    console.log("🤖 Iniciando bot com IA...");
+    if (CFG.GEMINI_API_KEY.includes("COLE-SUA-CHAVE")) {
+      console.log("⚠️  ATENÇÃO: configure a GEMINI_API_KEY no config.js!");
+      console.log("   Pegue grátis em: https://aistudio.google.com/apikey\n");
+    }
+    sockAtual = await iniciarBot();
+    iniciarServidorHTTP(() => sockAtual);
+    setInterval(verificarLembretesDeUrgencia, 5 * 60 * 1000);
+  })().catch((e) => {
+    console.error("Erro fatal ao iniciar o bot:", e.message);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  historicoConfirmaDeslocamento,
+};
