@@ -50,6 +50,66 @@ function salvarAgendamento(dados) {
   console.log("📅 NOVO AGENDAMENTO:", dados.nome, "-", dados.horario);
 }
 
+const ARQ_LISTA_ESPERA = path.join(DATA_DIR, "lista-espera-novo-progresso.json");
+
+function carregarListaEsperaNovoProgresso() {
+  try {
+    const lista = JSON.parse(fs.readFileSync(ARQ_LISTA_ESPERA, "utf8"));
+    return Array.isArray(lista) ? lista : [];
+  } catch {
+    return [];
+  }
+}
+
+function salvarListaEsperaNovoProgresso(lista) {
+  salvarJsonSeguro(ARQ_LISTA_ESPERA, lista, "lista de espera de Novo Progresso");
+}
+
+function adicionarListaEsperaNovoProgresso({ nome, telefone, origem = "whatsapp" }) {
+  const lista = carregarListaEsperaNovoProgresso();
+  const telefoneLimpo = (telefone || "").replace("@s.whatsapp.net", "");
+  const nomeLimpo = nomeValido(nome) ? nome.trim() : null;
+  const agora = new Date().toISOString();
+  const mesmoTelefone = (item) => telefonesEquivalentes(item.telefone, telefoneLimpo);
+
+  if (nomeLimpo) {
+    const existente = lista.find(
+      (item) => mesmoTelefone(item) && (item.nome || "").toLowerCase() === nomeLimpo.toLowerCase()
+    );
+    if (existente) {
+      existente.atualizadoEm = agora;
+      salvarListaEsperaNovoProgresso(lista);
+      return existente;
+    }
+
+    const pendente = lista.find((item) => mesmoTelefone(item) && !item.nome);
+    if (pendente) {
+      pendente.nome = nomeLimpo;
+      pendente.atualizadoEm = agora;
+      pendente.origem = origem;
+      salvarListaEsperaNovoProgresso(lista);
+      console.log("📝 LISTA DE ESPERA ATUALIZADA:", nomeLimpo, "- Novo Progresso-PA");
+      return pendente;
+    }
+  } else if (lista.some(mesmoTelefone)) {
+    return lista.find(mesmoTelefone);
+  }
+
+  const item = {
+    nome: nomeLimpo,
+    telefone: telefoneLimpo,
+    cidade: "Novo Progresso-PA",
+    status: "aguardando_data",
+    origem,
+    criadoEm: agora,
+    atualizadoEm: agora,
+  };
+  lista.push(item);
+  salvarListaEsperaNovoProgresso(lista);
+  console.log("📝 LISTA DE ESPERA:", nomeLimpo || telefoneLimpo, "- Novo Progresso-PA");
+  return item;
+}
+
 
 const ARQ_PAUSADOS = path.join(DATA_DIR, "pausados.json");
 
@@ -332,6 +392,36 @@ function salvarHistoricos() {
 }
 
 const historicos = carregarHistoricos();
+
+function textoMencionaNovoProgresso(texto) {
+  return (texto || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .includes("novo progresso");
+}
+
+function migrarNovoProgressoDosHistoricos() {
+  let encontrados = 0;
+  for (const [jid, mensagens] of historicos.entries()) {
+    const mencionouCidade = (mensagens || []).some(
+      (m) => m.role === "cliente" && textoMencionaNovoProgresso(m.text)
+    );
+    if (!mencionouCidade) continue;
+    const antes = carregarListaEsperaNovoProgresso().length;
+    adicionarListaEsperaNovoProgresso({
+      nome: null,
+      telefone: resolverTelefone(jid),
+      origem: "historico",
+    });
+    if (carregarListaEsperaNovoProgresso().length > antes) encontrados += 1;
+  }
+  if (encontrados > 0) {
+    console.log(`📝 ${encontrados} contato(s) de Novo Progresso recuperado(s) do histórico.`);
+  }
+}
+
+migrarNovoProgressoDosHistoricos();
 const MAX_HISTORICO = 80;
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -448,6 +538,9 @@ function promptSistema(jid) {
   const telefone = resolverTelefone(jid);
   const todosAgendamentos = carregarAgendamentos();
   const agendamentosContato = todosAgendamentos.filter((a) => telefonesEquivalentes(a.telefone, telefone));
+  const esperaNovoProgressoContato = carregarListaEsperaNovoProgresso().filter((item) =>
+    telefonesEquivalentes(item.telefone, telefone)
+  );
   const contagemPorHorario = {};
   for (const a of todosAgendamentos) {
     contagemPorHorario[a.horario] = (contagemPorHorario[a.horario] || 0) + 1;
@@ -495,6 +588,7 @@ SEU OBJETIVO:
 2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA (PRIORIDADE TOTAL DA CAMPANHA): para TODA pessoa NOVA, agende diretamente no dia 16 de setembro. Não pergunte qual dia ela prefere, não ofereça o dia 17 junto e não mencione outra data enquanto ela não recusar o dia 16. O dia 17 é SOMENTE alternativa: só ofereça e agende no dia 17 se a própria pessoa disser claramente que não consegue comparecer no dia 16. No dia 17, existem vagas novas SOMENTE À TARDE; nunca agende pessoa nova pela manhã nesse dia. Nos dois dias não existe hora marcada: informe que o atendimento é por ordem de chegada. Se a pessoa pedir horário específico, explique isso e mantenha apenas a reserva do dia.
 2.1.6. CASO ESPECIAL — DIVINÓPOLIS-PA: para pessoas NOVAS existe SOMENTE o dia 23 de setembro (o dia 22 não está mais disponível e nem vai aparecer na lista de horários) — escolha e confirme direto num horário do dia 23, sem perguntar qual dia ela prefere. NUNCA diga que o dia 22 está cheio/lotado/esgotado — apenas ofereça o dia 23 normalmente, sem mencionar o dia 22.
 2.1.7. CASO ESPECIAL — TRAIRÃO-PA: para pessoas NOVAS, agende SOMENTE no dia 21 de setembro — escolha e confirme direto num horário do dia 21, sem perguntar qual dia ela prefere e sem mencionar o dia 20 como opção. O dia 20 de setembro é EXCEÇÃO: só ofereça (e agende) o dia 20 se a própria pessoa disser que NÃO consegue de jeito nenhum no dia 21 (ex: "só posso no domingo"). Nunca diga que o dia 20 está cheio ou indisponível — apenas não ofereça, a menos que a pessoa diga que só consegue nesse dia.
+2.1.8. CASO ESPECIAL — NOVO PROGRESSO-PA: vamos atender em Novo Progresso futuramente, mas a data ainda não foi definida. Se a pessoa disser que é de Novo Progresso, NÃO ofereça outra cidade e NÃO faça agendamento comum. Se ainda não souber o nome completo, diga que haverá atendimento na própria cidade em breve, que avisaremos quando a data for confirmada, e peça o nome completo para colocar na lista de espera. Assim que souber o nome, responda de forma curta e acolhedora, por exemplo: "Perfeito! Vamos atender em Novo Progresso em breve. Deixei seu nome na nossa lista de espera e vamos avisar por aqui assim que a data for confirmada 😊". Finalize com a marcação exata em uma linha separada: ###LISTA_ESPERA_NOVO_PROGRESSO###{"nome":"NOME COMPLETO"}. Essa marcação é invisível para a pessoa. NUNCA use ###AGENDAR### para Novo Progresso enquanto não existir uma data oficial.
 2.2. DISTRIBUIÇÃO OBRIGATORIAMENTE IGUAL ENTRE MANHÃ E TARDE: divida sempre o total do dia/cidade igualmente entre os dois períodos. Exemplos: 30 pessoas = 15 de manhã e 15 à tarde; 60 = 30 e 30; 100 = 50 e 50. Se o total for ímpar, a diferença máxima permitida é uma pessoa (ex: 31 = 16/15). O sistema já ordena a lista colocando primeiro o período e o horário com menos pessoas e também corrige a escolha antes de salvar. Escolha SEMPRE o primeiro horário visível da lista. Não pergunte qual período a pessoa prefere antes de confirmar. Cada horário individual tem no máximo ${VAGAS_POR_HORARIO} vagas. A única exceção é quando uma regra específica fecha um período inteiro, como a manhã do dia 17 em Moraes de Almeida.
 3. Se, DEPOIS de você já ter confirmado, a pessoa disser que não consegue comparecer naquele dia, pergunte qual outro DIA disponível fica melhor. Não ofereça nem confirme horário específico, pois o atendimento é por ordem de chegada. Quando ela escolher outro dia, use a marcação ###REAGENDAR### pra trocar o registro anterior pelo novo, como descrito nas REGRAS DO AGENDAMENTO abaixo.
 3.1. NUNCA descarte ou desanime a pessoa por causa de horário. Sempre que for usar um horário fora dos horários redondos da lista (seja porque os redondos encheram, seja porque a pessoa pediu um horário específico depois de recusar o primeiro), a marcação ###AGENDAR### ou ###REAGENDAR### tem que usar EXATAMENTE o texto de um horário daquele mesmo dia/cidade que já está na lista HORÁRIOS DISPONÍVEIS, só trocando a parte final "às HH:MM" — nunca mude a data, o ano, a cidade nem a ordem das palavras, e nunca invente um ano diferente do que está na lista (a lista não tem ano, então você também não escreve ano nenhum).
@@ -520,6 +614,9 @@ AGENDAMENTOS JÁ FEITOS POR ESSE CONTATO (mesmo número de WhatsApp):
 ${agendamentosContato.length ? agendamentosContato.map((a) => `- ${a.nome}: ${a.horario}`).join("\n") : "Nenhum agendamento anterior encontrado pra esse contato."}
 - IMPORTANTE: um agendamento que já está nessa lista é SEMPRE válido, mesmo que a data dele não apareça mais na lista HORÁRIOS DISPONÍVEIS PARA AGENDAR (a lista de disponíveis é só pra gente NOVA, não afeta quem já confirmou). NUNCA diga pra uma pessoa que já tem um agendamento nessa lista que "não vai ter atendimento" ou que a cidade dela "não tem mais data" — o agendamento dela continua de pé normalmente, só reforce a confirmação se ela perguntar.
 - ATENÇÃO — SÓ CONFIE NESSA LISTA, NUNCA NO HISTÓRICO DE MENSAGENS: essa lista acima é a ÚNICA fonte confiável pra saber se alguém já está agendado de verdade. Se em alguma mensagem ANTERIOR da conversa (sua ou de um atendente humano) parecer que alguém já foi confirmado/agendado, mas o nome dessa pessoa NÃO aparece na lista acima, significa que esse agendamento NUNCA foi salvo de verdade no sistema — trate essa pessoa como AINDA NÃO agendada e agende ela agora com ###AGENDAR###, mesmo que uma mensagem anterior já tenha dito "prontinho, confirmado". Nunca deixe de agendar alguém só porque uma mensagem antiga do histórico parece confirmar isso.
+
+LISTA DE ESPERA DE NOVO PROGRESSO PARA ESTE CONTATO:
+${esperaNovoProgressoContato.length ? esperaNovoProgressoContato.map((item) => `- ${item.nome || "nome ainda não informado"}: aguardando definição da data`).join("\n") : "Ainda não está na lista de espera."}
 
 REGRAS DO AGENDAMENTO (MUITO IMPORTANTE):
 - ANTES de confirmar um agendamento, olhe a lista AGENDAMENTOS JÁ FEITOS POR ESSE CONTATO acima. Se o NOME que a pessoa está agendando agora JÁ aparece nessa lista, NÃO agende de novo direto — pergunte primeiro algo como: "Vi que [nome] já tem um agendamento marcado pra [horário anterior]. Quer agendar mais um horário (por exemplo pra outra pessoa da família), ou prefere mudar esse agendamento pra um horário novo?" Só prossiga depois que ela responder essa pergunta.
@@ -658,6 +755,27 @@ function formatarDataHora(horario) {
 function processarResposta(textoIA, jid) {
   let texto = textoIA;
   const confirmacoes = [];
+
+  const marcaListaEspera = /###LISTA_ESPERA_NOVO_PROGRESSO###\s*(\{[\s\S]*?\})/g;
+  const marcacoesListaEspera = [...texto.matchAll(marcaListaEspera)];
+  if (marcacoesListaEspera.length > 0) {
+    for (const m of marcacoesListaEspera) {
+      try {
+        const dados = JSON.parse(m[1]);
+        adicionarListaEsperaNovoProgresso({
+          nome: dados.nome,
+          telefone: resolverTelefone(jid),
+          origem: "whatsapp",
+        });
+      } catch (e) {
+        console.error("Falha ao incluir na lista de espera de Novo Progresso:", e.message);
+      }
+    }
+    texto = texto.replace(marcaListaEspera, "").trim();
+    // Lista de espera não é agendamento: bloqueia qualquer marca de agenda que a IA
+    // tenha incluído por engano na mesma resposta.
+    texto = texto.replace(/###(?:AGENDAR|REAGENDAR)###\s*\{[\s\S]*?\}/g, "").trim();
+  }
 
   const pareceConfirmacao = /\*[^*]+\*/.test(texto) && /às\s*\d{2}:\d{2}/i.test(texto);
   const temMarcador = /###AGENDAR###|###REAGENDAR###/.test(texto);
@@ -839,6 +957,14 @@ function processarResposta(textoIA, jid) {
 async function responder(sock, jid, textoRecebido) {
   const texto = (textoRecebido || "").trim();
   if (!texto) return;
+
+  if (textoMencionaNovoProgresso(texto)) {
+    adicionarListaEsperaNovoProgresso({
+      nome: null,
+      telefone: resolverTelefone(jid),
+      origem: "whatsapp",
+    });
+  }
 
   let hist = historicos.get(jid) || [];
   hist.push({ role: "cliente", text: texto });
@@ -1135,6 +1261,7 @@ function iniciarServidorHTTP(getSock) {
       horarios: CFG.HORARIOS,
       cidades: agruparHorariosPorCidade(CFG.HORARIOS),
       agendamentos: carregarAgendamentos(),
+      listaEsperaNovoProgresso: carregarListaEsperaNovoProgresso(),
       pausados: [...pausados].map((jid) => jid.replace("@s.whatsapp.net", "")),
       conversas,
       statusConexao,
