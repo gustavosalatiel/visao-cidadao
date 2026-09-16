@@ -995,6 +995,55 @@ function processarResposta(textoIA, jid) {
   return texto;
 }
 
+function tentarReagendarMoraesParaHoje(jid, textoRecebido) {
+  const texto = (textoRecebido || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const pediuHoje =
+    /(?:quero|pode|marca|muda|troca|coloca|prefiro)[^.!?]{0,30}(?:hoje|dia\s*16)/.test(texto) ||
+    /(?:hoje|dia\s*16)[^.!?]{0,30}(?:quero|pode|marca|muda|troca|coloca|prefiro)/.test(texto);
+  const hoje = hojeNoAcre();
+  if (!pediuHoje || hoje.getUTCMonth() !== 8 || hoje.getUTCDate() !== 16) return null;
+
+  const telefone = resolverTelefone(jid);
+  const stemDia17 = "Quinta-feira 17 de setembro em Moraes de Almeida-PA";
+  const lista = carregarAgendamentos();
+  const agendamentosAntigos = lista.filter(
+    (a) => telefonesEquivalentes(a.telefone, telefone) && stemDoHorario(a.horario) === stemDia17
+  );
+  if (agendamentosAntigos.length === 0) return null;
+
+  const semAntigos = lista.filter((a) => !agendamentosAntigos.includes(a));
+  const baseDia16 = CFG.HORARIOS.find(
+    (h) => stemDoHorario(h) === "Quarta-feira 16 de setembro em Moraes de Almeida-PA"
+  );
+  if (!baseDia16) return null;
+  const horarioNovo = escolherHorarioEquilibrado(baseDia16, semAntigos, agendamentosAntigos.length);
+  if (!horarioValido(horarioNovo, semAntigos)) return null;
+
+  const atualizada = lista.map((a) =>
+    agendamentosAntigos.includes(a)
+      ? { ...a, horario: horarioNovo, atualizadoEm: new Date().toISOString() }
+      : a
+  );
+  fs.writeFileSync(ARQ_AGENDAMENTOS, JSON.stringify(atualizada, null, 2));
+  console.log(
+    `🔄 PRIORIDADE DE HOJE: ${agendamentosAntigos.length} agendamento(s) alterado(s) do dia 17 para o dia 16.`
+  );
+
+  const endereco = CFG.ENDERECOS_POR_CIDADE["Moraes de Almeida-PA"];
+  const nomes = agendamentosAntigos.map((a) => a.nome).filter(Boolean);
+  const chamada = nomes.length === 1 ? `, ${nomes[0]}` : "";
+  return (
+    `Prontinho${chamada}! Alterei o agendamento para *hoje, 16 de setembro*. ` +
+    `O atendimento é por ordem de chegada, sem horário marcado 😊\n\n` +
+    `📅 *Hoje, 16 de setembro*\n` +
+    `🕐 Atendimento por ordem de chegada\n` +
+    (endereco ? `📍 *${endereco}*` : "")
+  ).trim();
+}
+
 async function responder(sock, jid, textoRecebido) {
   const texto = (textoRecebido || "").trim();
   if (!texto) return;
@@ -1015,17 +1064,22 @@ async function responder(sock, jid, textoRecebido) {
 
   let resposta;
   let houveErroIA = false;
-  try {
-    resposta = await perguntarIA(hist, jid);
-    resposta = processarResposta(resposta, jid);
-    resposta = resposta.replace(/\*\*(.+?)\*\*/g, "*$1*");
-    if (!resposta) resposta = "Um momentinho... 😊";
-  } catch (e) {
-    console.error("Erro na IA:", e.message);
-    houveErroIA = true;
-    resposta =
-      `Oi! Aqui é da ${CFG.NOME_EMPRESA} 😅 Deu uma falha rapidinha aqui do nosso lado agora. ` +
-      `Pode mandar sua mensagem de novo?`;
+  const respostaDireta = tentarReagendarMoraesParaHoje(jid, texto);
+  if (respostaDireta) {
+    resposta = respostaDireta;
+  } else {
+    try {
+      resposta = await perguntarIA(hist, jid);
+      resposta = processarResposta(resposta, jid);
+      resposta = resposta.replace(/\*\*(.+?)\*\*/g, "*$1*");
+      if (!resposta) resposta = "Um momentinho... 😊";
+    } catch (e) {
+      console.error("Erro na IA:", e.message);
+      houveErroIA = true;
+      resposta =
+        `Oi! Aqui é da ${CFG.NOME_EMPRESA} 😅 Deu uma falha rapidinha aqui do nosso lado agora. ` +
+        `Pode mandar sua mensagem de novo?`;
+    }
   }
 
   try {
