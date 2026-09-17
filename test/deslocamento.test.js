@@ -6,6 +6,24 @@ const { historicoConfirmaDeslocamento } = require("../index");
 const cliente = (text) => ({ role: "cliente", text });
 const atendente = (text) => ({ role: "atendente", text });
 
+test("recusa recente invalida um aceite anterior", () => {
+  assert.equal(historicoConfirmaDeslocamento([
+    cliente("Consigo ir para Moraes"), cliente("Não consigo mais, é muito longe")
+  ], "Moraes de Almeida-PA"), false);
+});
+
+test("pergunta sobre destino não autoriza reserva", () => {
+  assert.equal(historicoConfirmaDeslocamento([
+    atendente("Consegue ir a Moraes?"), cliente("Vocês estão em Moraes?")
+  ], "Moraes de Almeida-PA"), false);
+});
+
+test("reclamação da conversa real não autoriza destino", () => {
+  assert.equal(historicoConfirmaDeslocamento([
+    atendente("Consegue ir para Moraes?"), cliente("Não muito longe em tudo")
+  ], "Moraes de Almeida-PA"), false);
+});
+
 test("não aceita a cidade de origem como autorização para outro município", () => {
   const historico = [cliente("Meu nome é Reinaldo e sou de Novo Progresso")];
   assert.equal(historicoConfirmaDeslocamento(historico, "Moraes de Almeida-PA"), false);

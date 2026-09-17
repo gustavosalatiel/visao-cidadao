@@ -62,7 +62,8 @@ function carregarListaEsperaNovoProgresso() {
 }
 
 function salvarListaEsperaNovoProgresso(lista) {
-  salvarJsonSeguro(ARQ_LISTA_ESPERA, lista, "lista de espera de Novo Progresso");
+  fs.writeFileSync(ARQ_LISTA_ESPERA + ".tmp", JSON.stringify(lista, null, 2));
+  fs.renameSync(ARQ_LISTA_ESPERA + ".tmp", ARQ_LISTA_ESPERA);
 }
 
 function adicionarListaEsperaNovoProgresso({ nome, telefone, origem = "whatsapp" }) {
@@ -561,7 +562,7 @@ function aplicarPrioridadeMoraesDia16(horarioSolicitado, jid) {
   }
 
   const horarioDia16 = CFG.HORARIOS.find(
-    (h) => stemDoHorario(h) === "Quarta-feira 16 de setembro em Moraes de Almeida-PA"
+    (h) => stemDoHorario(h) === "Quarta-feira 16 de setembro em Moraes de Almeida-PA" && !horarioJaPassou(h)
   );
   if (horarioDia16) {
     console.log("📌 Prioridade aplicada: agendamento de Moraes redirecionado do dia 17 para o dia 16.");
@@ -593,11 +594,13 @@ function historicoConfirmaDeslocamento(mensagens, cidade) {
     const atual = mensagens[i];
     if (atual.role !== "cliente") continue;
     const resposta = normalizarBusca(atual.text);
-    if (/\b(?:nao consigo|nao posso|nao vou|longe demais|muito longe|nao da)\b/.test(resposta)) continue;
+    // Uma recusa recente invalida um aceite antigo; dúvidas não são consentimento.
+    if (/\b(?:nao|n|longe|distante|cancelar|cancela)\b/.test(resposta)) return false;
+    if (/[?]/.test(resposta) || /\b(?:talvez|depende|vou ver|se eu|sera|onde|qual)\b/.test(resposta)) return false;
 
     const confirmouDireto =
       alvos.some((alvo) => resposta.includes(alvo)) &&
-      /\b(?:consigo|posso|vou|aceito|quero|pode marcar|pode agendar)\b/.test(resposta);
+      /\b(?:consigo ir|posso ir|vou ir|vou para|vou pra|vou ate|quero ir|pode marcar|pode agendar)\b/.test(resposta);
     if (confirmouDireto) return true;
 
     const anterior = mensagens[i - 1];
@@ -613,7 +616,7 @@ function historicoConfirmaDeslocamento(mensagens, cidade) {
     const respostaAfirmativa =
       (/^(?:sim|consigo|posso|vou|pode|ok|combinado|quero)(?:\b|[!,.;])/.test(resposta) &&
         (cidadesMencionadas <= 1 || escolheuCidade)) ||
-      escolheuCidade;
+      (escolheuCidade && alvos.some((alvo) => resposta.trim() === alvo));
     if (perguntouSobreLocal && respostaAfirmativa) return true;
   }
   return false;
@@ -621,13 +624,6 @@ function historicoConfirmaDeslocamento(mensagens, cidade) {
 
 function clienteConfirmouDeslocamento(jid, cidade) {
   return historicoConfirmaDeslocamento(historicos.get(jid) || [], cidade);
-}
-
-function contatoJaConfirmadoNaCidade(jid, cidade) {
-  const telefone = resolverTelefone(jid);
-  return carregarAgendamentos().some(
-    (a) => telefonesEquivalentes(a.telefone, telefone) && extrairCidade(a.horario) === cidade
-  );
 }
 
 function perguntaConfirmacaoDeLocal(cidade) {
@@ -702,7 +698,7 @@ SEU OBJETIVO:
 2.1.2. CASO ESPECIAL — ITAITUBA/MORAES DE ALMEIDA: Moraes de Almeida é distrito de Itaituba, mas NÃO presuma que quem mora em Itaituba consegue viajar até lá. Diga claramente que o atendimento será em Moraes de Almeida, informe data e endereço e pergunte se consegue se deslocar. Só agende depois do "sim" explícito.
 2.1.3. CASO ESPECIAL — RURÓPOLIS/DIVINÓPOLIS: Divinópolis (Km-70) é distrito de Rurópolis, mas NÃO presuma que quem mora em Rurópolis consegue viajar até lá. Diga claramente que o atendimento será em Divinópolis, informe data e endereço e pergunte se consegue se deslocar. Só agende depois do "sim" explícito.
 2.1.5. CASO ESPECIAL — PESSOA DISSE SÓ O ESTADO, SEM CIDADE (ex: "sou do Pará", "moro no Acre"): cidades ativas por estado agora: ${resumoPorEstado || "nenhuma"}. Antes de dizer que não tem atendimento, veja se o estado que ela mencionou está nessa lista. Se estiver, NUNCA diga que não tem atendimento nesse estado — pergunte de qual cidade/região específica dentro do estado ela é, citando as cidades ativas daquele estado como opção (ex: "Legal! No Pará estamos atendendo em Moraes de Almeida, Bela Vista do Caracol, Trairão e Divinópolis — qual dessas fica mais perto de você?"). Só diga que não tem atendimento se o estado dela realmente não tiver nenhuma cidade ativa na lista.
-2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA (PRIORIDADE TOTAL DA CAMPANHA): depois que a pessoa confirmar que consegue comparecer em Moraes de Almeida, priorize o dia 16 de setembro. Não ofereça o dia 17 junto. O dia 17 é alternativa apenas se ela disser claramente que não consegue no dia 16; nele, novas vagas são somente à tarde. O atendimento é por ordem de chegada.
+2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA: a data atual é ${hojeNoAcre().toISOString().slice(0, 10)}. Depois de confirmar o local, priorize o dia 16 de setembro SOMENTE se ele ainda aparecer em HORÁRIOS DISPONÍVEIS. Enquanto o dia 16 estiver ativo, ofereça o dia 17 apenas se a pessoa não puder no dia 16. Se o dia 16 já passou, ofereça normalmente o próximo dia disponível, sem exigir recusa de uma data passada. No dia 17, novas vagas são somente à tarde. Nunca ofereça datas passadas. O atendimento é por ordem de chegada.
 2.1.6. CASO ESPECIAL — DIVINÓPOLIS-PA: existe somente o dia 23 de setembro para pessoas novas. Informe local/data/endereço, confirme se consegue ir e só então agende no dia 23. Não mencione o dia 22.
 2.1.7. CASO ESPECIAL — TRAIRÃO-PA: apresente o atendimento em Trairão e confirme se a pessoa consegue ir. Depois do aceite, priorize o dia 21. O dia 20 é exceção apenas se ela disser que não consegue no dia 21.
 2.1.8. PRIORIDADE SOBRE AS REGRAS GERAIS — NOVO PROGRESSO-PA: haverá atendimento na própria cidade em breve, mas a data ainda não foi definida. Assim que a pessoa informar Novo Progresso, diga: "Vamos atender em Novo Progresso em breve 😊 A data ainda não está definida. Qual é o seu nome completo para deixar você na lista de espera? Vamos avisar por aqui assim que a data for confirmada." Se já souber o nome completo, registre usando ###LISTA_ESPERA_NOVO_PROGRESSO###{"nome":"NOME COMPLETO"} e confirme a inclusão na lista, nunca uma consulta agendada. NÃO ofereça outra cidade espontaneamente. Só apresente outros locais se a própria pessoa pedir explicitamente atendimento fora de Novo Progresso. Se ela disser que é longe, que não consegue ir, "não muito longe em tudo", ou perguntar por que não atendemos lá, retome a informação de atendimento futuro e peça o nome para a lista. "Pará" após "Novo Progresso" apenas complementa o estado: não esqueça a cidade e não liste novamente cidades do Pará. Nunca diga "quem sabe numa próxima edição" nem invente justificativas para a rota. O aviso acontecerá quando a data estiver confirmada, não prometa aviso automático ou data específica.
@@ -975,9 +971,7 @@ function processarResposta(textoIA, jid) {
           )
         : carregarAgendamentos();
       const cidadeDoAtendimento = extrairCidade(horario);
-      const localConfirmado =
-        contatoJaConfirmadoNaCidade(jid, cidadeDoAtendimento) ||
-        clienteConfirmouDeslocamento(jid, cidadeDoAtendimento);
+      const localConfirmado = clienteConfirmouDeslocamento(jid, cidadeDoAtendimento);
       if (!nomeValido(dados.nome)) {
         console.error(
           "⚠️ Agendamento BLOQUEADO — nome inválido/placeholder:",
@@ -1039,9 +1033,7 @@ function processarResposta(textoIA, jid) {
         agendamentosSemOAntigo
       );
       const cidadeNova = extrairCidade(horarioNovo);
-      const confirmouCidadeNova =
-        contatoJaConfirmadoNaCidade(jid, cidadeNova) ||
-        clienteConfirmouDeslocamento(jid, cidadeNova);
+      const confirmouCidadeNova = clienteConfirmouDeslocamento(jid, cidadeNova);
       if (!confirmouCidadeNova) {
         localPendenteConfirmacao = cidadeNova;
         console.error(
