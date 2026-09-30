@@ -69,3 +69,11 @@ test('Placas (atendimento em negociação): prompt manda direto para a lista res
   assert.equal(salvo.nome, 'João Batista Conceição');
   assert.match(enviadas.at(-1), /Estamos organizando o atendimento em Placas, ainda sem data confirmada/);
 });
+
+test('cidade com atendimento ativo nunca entra na lista reserva', async () => {
+  const antes = bot.carregarListaReserva().length;
+  const enviadas = await conversar([marcar('Rosa Maria Campos', 'Novo Progresso')], ['Rosa Maria Campos, Novo Progresso, não consigo ir']);
+  assert.equal(bot.carregarListaReserva().length, antes);
+  assert.match(enviadas.at(-1), /Novo Progresso-PA/);
+  assert.doesNotMatch(enviadas.at(-1), /lista reserva/);
+});

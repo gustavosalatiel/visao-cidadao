@@ -1052,6 +1052,11 @@ function prepararDadosAgenda(termo) {
     if (!esperasPorCidade.has(item.cidade)) esperasPorCidade.set(item.cidade, []);
     esperasPorCidade.get(item.cidade).push(item);
   }
+  // Localidades em negociação aparecem mesmo antes de alguém entrar na lista reserva.
+  for (const local of dados.cidadesEmNegociacao || []) {
+    const chave = `Lista reserva — ${local}`;
+    if (!esperasPorCidade.has(chave)) esperasPorCidade.set(chave, []);
+  }
   const cidadesOrdenadas = dados.cidades.map((g) => g.cidade);
   for (const cidade of esperasPorCidade.keys()) {
     if (!cidadesOrdenadas.includes(cidade)) cidadesOrdenadas.push(cidade);
@@ -1144,7 +1149,17 @@ function montarBlocoCidade(cidade, ctx, incluirEspera = false) {
     : "";
 
   const esperas = incluirEspera ? (ctx.esperasPorCidade.get(cidade) || []).filter(p => !ctx.termo || telefoneBate(ctx.termo, cidade, p.nome, p.telefone || p.jid)) : [];
-  const blocoEspera = esperas.length ? `
+  const reserva = cidade.startsWith("Lista reserva — ");
+  const emNegociacao = reserva && (dados.cidadesEmNegociacao || []).some((c) => cidade === `Lista reserva — ${c}`);
+  const rotuloEspera = reserva ? "na lista reserva" : "na espera";
+  if (reserva && !esperas.length && !(emNegociacao && incluirEspera && !ctx.termo)) return null;
+  const blocoEspera = reserva ? `
+    <details class="horario-sub lista-espera" data-key="espera:${escaparHtml(cidade)}" ${estaAberto(`espera:${cidade}`, true) ? "open" : ""}>
+      <summary><span>${emNegociacao ? "Atendimento em negociação — sem data confirmada" : "Sem atendimento na cidade — pessoas que não conseguem ir às cidades ativas"}</span><span class="badge">${esperas.length} ${rotuloEspera}</span></summary>
+      <p class="aviso-espera">${emNegociacao ? "Quem procurar desta localidade entra aqui automaticamente. Quando a data for fechada, avise estas pessoas." : "Avise estas pessoas quando houver atendimento na região."} Estes nomes não são agendamentos confirmados.</p>
+      ${esperas.length ? `<ul class="lista-pessoas">${esperas.map(linhaListaEspera).join("")}</ul>
+      <div style="padding:12px 16px"><button class="btn-fraco" data-cidade="${escaparHtml(cidade)}" onclick="exportarListaEspera(this.dataset.cidade)">Exportar lista reserva desta cidade</button></div>` : ""}
+    </details>` : esperas.length ? `
     <details class="horario-sub lista-espera" data-key="espera:${escaparHtml(cidade)}" ${estaAberto(`espera:${cidade}`, true) ? "open" : ""}>
       <summary><span>Lista de espera — atendimento ainda não confirmado</span><span class="badge">${esperas.length} na espera</span></summary>
       <p class="aviso-espera">${cidade === "Novo Progresso-PA" ? "Interesses registrados anteriormente. Confirme com cada pessoa o dia e o comparecimento antes de agendar." : "Aguardando definição de uma nova data, local e horário."} Estes nomes não são agendamentos confirmados.</p>
@@ -1159,8 +1174,8 @@ function montarBlocoCidade(cidade, ctx, incluirEspera = false) {
   const html = `
     <details class="municipio-grupo" data-key="${escaparHtml(chaveCidade)}" ${estaAberto(chaveCidade, true) ? "open" : ""}>
       <summary>
-        <span>📍 ${escaparHtml(cidade)}${totalCidade === 0 && esperas.length ? " — Lista de espera" : ""}</span>
-        <span class="badge-cidade">${totalCidade ? `${totalCidade} agendado${totalCidade === 1 ? "" : "s"}` : esperas.length ? "" : "0 agendados"}${totalCidade && esperas.length ? " · " : ""}${esperas.length ? `${esperas.length} na espera` : ""}</span>
+        <span>📍 ${escaparHtml(cidade)}${totalCidade === 0 && esperas.length && !reserva ? " — Lista de espera" : ""}</span>
+        <span class="badge-cidade">${totalCidade ? `${totalCidade} agendado${totalCidade === 1 ? "" : "s"}` : esperas.length || reserva ? "" : "0 agendados"}${totalCidade && esperas.length ? " · " : ""}${esperas.length || reserva ? `${esperas.length} ${rotuloEspera}` : ""}</span>
       </summary>
       ${totalCidade ? `<div style="padding:12px 16px;">
         <button class="btn-fraco" data-cidade="${escaparHtml(cidade)}" onclick="exportarCidade(this.dataset.cidade)">⬇ Exportar planilha desta cidade</button>

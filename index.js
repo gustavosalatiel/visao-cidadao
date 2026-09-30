@@ -1562,6 +1562,13 @@ function processarResposta(textoIA, jid, { exigirAceite = false, horarioAceito =
           }).join("");
         }
         const cidade = typeof dados.cidade === "string" ? dados.cidade.trim() : "";
+        // Lista reserva é só para onde não há atendimento: cidade ativa volta para o agendamento.
+        const cidadeAtiva = CIDADES_CONHECIDAS.find((c) => cidadeTemDataFutura(c) &&
+          apelidosDaCidade(c).some((a) => textoSemBairroHomonimo(cidade).includes(a)));
+        if (cidadeAtiva) {
+          console.error("⚠️ Lista reserva BLOQUEADA — cidade com atendimento ativo:", cidadeAtiva, "| jid:", jid);
+          return perguntaConfirmacaoDeLocal(cidadeAtiva);
+        }
         if (!porCidade.has(cidade)) porCidade.set(cidade, []);
         porCidade.get(cidade).push(nome);
       }
@@ -2262,6 +2269,7 @@ function iniciarServidorHTTP(getSock) {
       listaEsperaNovoProgresso: carregarListaEsperaNovoProgresso().map(p => identificarEspera(p, "novo-progresso")),
       listaEsperaRetornos: carregarListaRetornos().map(p => identificarEspera(p, "retornos")),
       listaReserva: carregarListaReserva().map(p => identificarEspera(p, "reserva")),
+      cidadesEmNegociacao: CIDADES_EM_NEGOCIACAO,
       pausados: [...pausados].map((jid) => jid.replace("@s.whatsapp.net", "")),
       conversas,
       statusConexao,
