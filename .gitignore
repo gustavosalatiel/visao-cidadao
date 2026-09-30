@@ -1,6 +1,16 @@
 node_modules/
 .env
 auth/
+auth.anterior-*/
 agendamentos.json
 pausados.json
 contatos.json
+historicos.json
+controle-ia.json
+propostas-agendamento.json
+lista-espera-*.json
+lista-reserva.json
+backups/
+backup-*/
+releases/
+*.bak*

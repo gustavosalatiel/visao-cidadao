@@ -161,38 +161,8 @@
   }
   #painelConversas .secao-header { background: linear-gradient(90deg, var(--azul-fraco), #fff); }
   #painelAgenda .secao-header { background: linear-gradient(90deg, var(--verde-fraco), #fff); }
-  #painelEspera .secao-header { background: linear-gradient(90deg, var(--ambar-fraco), #fff); }
   .secao-header h2 { font-size: 16px; margin: 0; color: var(--azul); }
   .secao-body { padding: 4px 20px 16px; }
-  .espera-aviso {
-    margin: 14px 0 4px;
-    padding: 12px 14px;
-    border-left: 4px solid var(--ambar);
-    border-radius: 8px;
-    background: var(--ambar-fraco);
-    color: #704512;
-    font-size: 13px;
-  }
-  .espera-item {
-    display: grid;
-    grid-template-columns: minmax(180px, 1fr) minmax(150px, .8fr) auto;
-    gap: 16px;
-    align-items: center;
-    padding: 14px 2px;
-    border-bottom: 1px solid var(--borda);
-  }
-  .espera-item:last-child { border-bottom: none; }
-  .espera-nome { font-weight: 750; color: var(--texto); }
-  .espera-meta { color: var(--texto-fraco); font-size: 12px; margin-top: 3px; }
-  .espera-status {
-    background: var(--ambar-fraco);
-    color: var(--ambar);
-    border-radius: 999px;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-weight: 800;
-    white-space: nowrap;
-  }
 
   input[type="text"], input[type="password"] {
     border: 1px solid var(--borda);
@@ -409,6 +379,10 @@
     font-weight: 800;
   }
   .horario-sub.fora-padrao summary:hover { background: #FED7AA; }
+  .lista-espera summary { background: var(--ambar-fraco); color: #713f12; min-height: 44px; }
+  .lista-espera summary span:first-child { white-space: normal; overflow-wrap: anywhere; }
+  .aviso-espera { padding: 12px 16px; margin: 0; color: #713f12; line-height: 1.5; }
+  .lista-espera .lista-pessoas li { flex-wrap: wrap; gap: 8px; }
   .horario-sub.fora-padrao .badge {
     background: #FB923C;
     color: #fff;
@@ -608,8 +582,6 @@
     .secao-header { padding: 14px 16px; }
     .secao-header > div { width: 100%; flex-direction: column; align-items: stretch; }
     .secao-body { padding: 4px 14px 14px; }
-    .espera-item { grid-template-columns: 1fr; gap: 6px; padding: 13px 2px; }
-    .espera-status { width: fit-content; }
     input[type="text"], input[type="password"], select {
       max-width: none;
       font-size: 16px;
@@ -660,7 +632,6 @@
     <div class="abas">
       <button class="aba-btn ativa" data-aba="conversas">Conversas</button>
       <button class="aba-btn" data-aba="agenda">Agenda por Município</button>
-      <button class="aba-btn" data-aba="espera">Lista de espera</button>
       <button class="aba-btn" data-aba="atendidas">Cidades Atendidas</button>
       <button class="aba-btn" data-aba="campanhas">Campanhas</button>
       <button class="aba-btn" data-aba="conexao">Conexão</button>
@@ -684,26 +655,10 @@
         <div style="display:flex; gap:8px; align-items:center;">
           <input type="text" id="buscaAgenda" placeholder="Buscar nome ou telefone..." />
           <button class="btn" onclick="abrirModalAgendamento()">+ Novo agendamento</button>
-          <button class="btn-fraco" id="btnExportar">Exportar CSV</button>
+          <button class="btn-fraco" id="btnExportar" title="Baixar todos os agendamentos em CSV para abrir no Excel">⬇ Exportar planilha completa</button>
         </div>
       </div>
       <div class="secao-body" id="listaAgenda"></div>
-    </div>
-
-    <div id="painelEspera" class="secao oculto">
-      <div class="secao-header">
-        <div>
-          <h2>Lista de espera — Novo Progresso</h2>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <input type="text" id="buscaEspera" placeholder="Buscar nome ou telefone..." />
-          <button class="btn-fraco" id="btnExportarEspera">Exportar CSV</button>
-        </div>
-      </div>
-      <div class="secao-body">
-        <div class="espera-aviso">Estas pessoas serão avisadas pelo WhatsApp assim que a data de atendimento em Novo Progresso for confirmada.</div>
-        <div id="listaEspera"></div>
-      </div>
     </div>
 
     <div id="painelAtendidas" class="secao oculto">
@@ -711,6 +666,7 @@
         <h2>Cidades já atendidas</h2>
         <div style="display:flex; gap:8px; align-items:center;">
           <input type="text" id="buscaAtendidas" placeholder="Buscar nome ou telefone..." />
+          <button class="btn-fraco" onclick="exportarCSV()">⬇ Exportar planilha completa</button>
         </div>
       </div>
       <div class="secao-body" id="listaAtendidas"></div>
@@ -824,13 +780,11 @@ function renderizar(dados) {
   const totalConversas = dados.conversas.length;
   const totalPausados = dados.conversas.filter((c) => c.pausado).length;
   const totalMunicipios = dados.cidades.length;
-  const totalEspera = (dados.listaEsperaNovoProgresso || []).length;
 
   const cards = [
     { icone: "💬", valor: totalConversas, rotulo: "Pessoas conversando", cor: "var(--azul)", corFraca: "var(--azul-fraco)" },
     { icone: "⏸️", valor: totalPausados, rotulo: "Aguardando atendimento humano", cor: "var(--ambar)", corFraca: "var(--ambar-fraco)" },
     { icone: "📅", valor: totalAgendamentos, rotulo: "Agendamentos totais", cor: "var(--verde)", corFraca: "var(--verde-fraco)" },
-    { icone: "📝", valor: totalEspera, rotulo: "Espera em Novo Progresso", cor: "var(--ambar)", corFraca: "var(--ambar-fraco)" },
     { icone: "📍", valor: totalMunicipios, rotulo: "Municípios no cronograma", cor: "var(--teal)", corFraca: "var(--teal-fraco)" },
   ];
 
@@ -849,7 +803,6 @@ function renderizar(dados) {
 
   renderizarConversas();
   renderizarAgenda();
-  renderizarListaEspera();
   renderizarAtendidas();
   if (abaAtiva === "conexao") renderizarConexao(dados);
 }
@@ -966,39 +919,6 @@ function renderizarConversas() {
   }
 }
 
-function renderizarListaEspera() {
-  const container = document.getElementById("listaEspera");
-  if (!dadosAtuais || !container) return;
-  const termo = document.getElementById("buscaEspera").value.trim();
-  const lista = (dadosAtuais.listaEsperaNovoProgresso || [])
-    .filter((item) => !termo || telefoneBate(termo, item.nome, item.telefone, item.cidade))
-    .sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || ""));
-
-  if (lista.length === 0) {
-    container.innerHTML = `<div class="vazio-msg">Nenhuma pessoa na lista de espera de Novo Progresso.</div>`;
-    return;
-  }
-
-  container.innerHTML = lista
-    .map((item) => {
-      const nome = item.nome || "Nome ainda não informado";
-      const telefone = formatarTelefone(item.telefone) || item.telefone || "Telefone não identificado";
-      const entrada = item.criadoEm
-        ? new Date(item.criadoEm).toLocaleDateString("pt-BR")
-        : "data não registrada";
-      return `
-        <div class="espera-item">
-          <div>
-            <div class="espera-nome">${escaparHtml(nome)}</div>
-            <div class="espera-meta">Novo Progresso-PA · entrou em ${escaparHtml(entrada)}</div>
-          </div>
-          <div>${escaparHtml(telefone)}</div>
-          <span class="espera-status">Aguardando data</span>
-        </div>`;
-    })
-    .join("");
-}
-
 async function enviarMensagem(telefone) {
   const idSeguro = telefone.replace(/[^a-zA-Z0-9]/g, "_");
   const input = document.getElementById("envio-" + idSeguro);
@@ -1007,14 +927,17 @@ async function enviarMensagem(telefone) {
   const chave = localStorage.getItem(LS_CHAVE);
   input.disabled = true;
   try {
-    await fetch("/api/enviar", {
+    const resp = await fetch("/api/enviar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chave, jid: telefone, texto }),
     });
+    if (!resp.ok) throw new Error((await resp.json()).erro || "Não foi possível enviar a mensagem");
     input.value = "";
     await carregarThread(telefone);
     atualizar();
+  } catch (e) {
+    alert(e.message || "Falha ao enviar. Seu texto foi preservado para tentar novamente.");
   } finally {
     input.disabled = false;
     input.focus();
@@ -1036,6 +959,7 @@ async function carregarThread(telefone) {
   if (!el) return;
   try {
     const resp = await fetch(`/api/conversa?jid=${encodeURIComponent(telefone)}&chave=${encodeURIComponent(chave)}`);
+    if (!resp.ok) throw new Error("Falha ao carregar conversa");
     const dados = await resp.json();
     const mensagens = dados.mensagens || [];
     el.innerHTML = mensagens.length
@@ -1063,13 +987,14 @@ function linhaAgendamento(p, comHorario) {
 async function marcarTransferido(criadoEm, transferido) {
   const chave = localStorage.getItem(LS_CHAVE);
   try {
-    await fetch("/api/agendamento-transferido", {
+    const resp = await fetch("/api/agendamento-transferido", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chave, criadoEm, transferido }),
     });
+    if (!resp.ok) throw new Error((await resp.json()).erro || "Não foi possível salvar a marcação");
     atualizar();
-  } catch (e) {}
+  } catch (e) { alert(e.message); atualizar(); }
 }
 
 function extrairCidadeCliente(horario) {
@@ -1122,17 +1047,65 @@ function prepararDadosAgenda(termo) {
     return pessoas.filter((p) => telefoneBate(termo, p.nome, p.telefone, p.horario));
   }
 
+  const esperasPorCidade = new Map();
+  for (const item of listasDeEspera(dados)) {
+    if (!esperasPorCidade.has(item.cidade)) esperasPorCidade.set(item.cidade, []);
+    esperasPorCidade.get(item.cidade).push(item);
+  }
   const cidadesOrdenadas = dados.cidades.map((g) => g.cidade);
+  for (const cidade of esperasPorCidade.keys()) {
+    if (!cidadesOrdenadas.includes(cidade)) cidadesOrdenadas.push(cidade);
+  }
   for (const cidade of outrosPorCidade.keys()) {
     if (!cidadesOrdenadas.includes(cidade)) cidadesOrdenadas.push(cidade);
   }
 
-  return { dados, porHorario, outrosPorCidade, outrosSemCidade, bate, bateLista, cidadesOrdenadas };
+  return { dados, porHorario, outrosPorCidade, outrosSemCidade, bate, bateLista, cidadesOrdenadas, esperasPorCidade, termo };
 }
 
-function montarBlocoCidade(cidade, ctx) {
+function listasDeEspera(dados) {
+  return [
+    ...(dados.listaEsperaNovoProgresso || []).map(p => ({ ...p, cidade: p.cidade || "Novo Progresso-PA" })),
+    ...(dados.listaEsperaRetornos || []).map(p => ({ ...p, cidade: p.cidade || "Cidade não informada" })),
+    ...(dados.listaReserva || []).map(p => ({ ...p, cidade: `Lista reserva — ${p.cidade || "Cidade não informada"}` }))
+      .sort((a, b) => a.cidade.localeCompare(b.cidade, "pt-BR") || (a.nome || "").localeCompare(b.nome || "", "pt-BR")),
+  ];
+}
+
+function linhaListaEspera(p) {
+  return `<li class="${p.verificado ? "transferido" : ""}">
+    <label class="check-transferido">
+      <input type="checkbox" ${p.verificado ? "checked" : ""} ${p.idEspera ? "" : "disabled"}
+        aria-label="Marcar como verificado: ${escaparHtml(p.nome || "Nome pendente")}" data-id="${escaparHtml(p.idEspera || "")}" data-origem="${escaparHtml(p.origemLista || "")}" onchange="marcarEsperaVerificada(this)" />
+      <span class="nome-pessoa">${escaparHtml(p.nome || "Nome pendente")}</span>
+    </label>
+    <span>${p.verificado ? "Já verificado" : "Não verificado"}</span>
+    <span class="tel">${escaparHtml(p.telefone || p.jid || "Contato pendente")}</span>
+  </li>`;
+}
+
+async function marcarEsperaVerificada(input) {
+  const verificado = input.checked;
+  input.disabled = true;
+  try {
+    const resp = await fetch("/api/espera-verificada", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chave: localStorage.getItem(LS_CHAVE), origemLista: input.dataset.origem, idEspera: input.dataset.id, verificado }),
+    });
+    const dados = await resp.json();
+    if (!resp.ok) throw new Error(dados.erro || "Não foi possível salvar a marcação");
+    await atualizar();
+  } catch (e) {
+    input.checked = !verificado;
+    alert(e.message || "Falha ao salvar. Tente novamente.");
+  } finally { input.disabled = false; }
+}
+
+function montarBlocoCidade(cidade, ctx, incluirEspera = false) {
   const { dados, porHorario, outrosPorCidade, bate, bateLista } = ctx;
-  const grupo = dados.cidades.find((g) => g.cidade === cidade);
+  const grupoOriginal = dados.cidades.find((g) => g.cidade === cidade);
+  const somenteEspera = incluirEspera && grupoOriginal?.passada;
+  const grupo = somenteEspera ? null : grupoOriginal;
   const linhasHorario = grupo
     ? grupo.horarios
         .filter((h) => bate(porHorario.get(h) || [], h))
@@ -1156,7 +1129,7 @@ function montarBlocoCidade(cidade, ctx) {
         .join("")
     : "";
 
-  const foraDoPadrao = bateLista(outrosPorCidade.get(cidade) || []);
+  const foraDoPadrao = somenteEspera ? [] : bateLista(outrosPorCidade.get(cidade) || []);
   const chaveFora = `fora:${cidade}`;
   const blocoFora = foraDoPadrao.length
     ? `
@@ -1170,18 +1143,29 @@ function montarBlocoCidade(cidade, ctx) {
     `
     : "";
 
-  if (!linhasHorario && !blocoFora) return null;
+  const esperas = incluirEspera ? (ctx.esperasPorCidade.get(cidade) || []).filter(p => !ctx.termo || telefoneBate(ctx.termo, cidade, p.nome, p.telefone || p.jid)) : [];
+  const blocoEspera = esperas.length ? `
+    <details class="horario-sub lista-espera" data-key="espera:${escaparHtml(cidade)}" ${estaAberto(`espera:${cidade}`, true) ? "open" : ""}>
+      <summary><span>Lista de espera — atendimento ainda não confirmado</span><span class="badge">${esperas.length} na espera</span></summary>
+      <p class="aviso-espera">${cidade === "Novo Progresso-PA" ? "Interesses registrados anteriormente. Confirme com cada pessoa o dia e o comparecimento antes de agendar." : "Aguardando definição de uma nova data, local e horário."} Estes nomes não são agendamentos confirmados.</p>
+      <ul class="lista-pessoas">${esperas.map(linhaListaEspera).join("")}</ul>
+      <div style="padding:12px 16px"><button class="btn-fraco" data-cidade="${escaparHtml(cidade)}" onclick="exportarListaEspera(this.dataset.cidade)">Exportar lista de espera desta cidade</button></div>
+    </details>` : "";
+  if (!linhasHorario && !blocoFora && !blocoEspera) return null;
 
   const totalHorarios = grupo ? grupo.horarios.reduce((soma, h) => soma + (porHorario.get(h) || []).length, 0) : 0;
   const totalCidade = totalHorarios + foraDoPadrao.length;
   const chaveCidade = `cidade:${cidade}`;
   const html = `
-    <details class="municipio-grupo" data-key="${chaveCidade}" ${estaAberto(chaveCidade, true) ? "open" : ""}>
+    <details class="municipio-grupo" data-key="${escaparHtml(chaveCidade)}" ${estaAberto(chaveCidade, true) ? "open" : ""}>
       <summary>
-        <span>📍 ${cidade}</span>
-        <span class="badge-cidade">${totalCidade} agendado${totalCidade === 1 ? "" : "s"}</span>
+        <span>📍 ${escaparHtml(cidade)}${totalCidade === 0 && esperas.length ? " — Lista de espera" : ""}</span>
+        <span class="badge-cidade">${totalCidade ? `${totalCidade} agendado${totalCidade === 1 ? "" : "s"}` : esperas.length ? "" : "0 agendados"}${totalCidade && esperas.length ? " · " : ""}${esperas.length ? `${esperas.length} na espera` : ""}</span>
       </summary>
-      ${linhasHorario}${blocoFora}
+      ${totalCidade ? `<div style="padding:12px 16px;">
+        <button class="btn-fraco" data-cidade="${escaparHtml(cidade)}" onclick="exportarCidade(this.dataset.cidade)">⬇ Exportar planilha desta cidade</button>
+      </div>` : ""}
+      ${linhasHorario}${blocoFora}${blocoEspera}
     </details>
   `;
 
@@ -1196,7 +1180,7 @@ function renderizarAgenda() {
 
   let html = "";
   for (const cidade of ctx.cidadesOrdenadas) {
-    const bloco = montarBlocoCidade(cidade, ctx);
+    const bloco = montarBlocoCidade(cidade, ctx, true);
     if (!bloco || bloco.passada) continue;
     html += bloco.html;
   }
@@ -1233,7 +1217,7 @@ function renderizarAtendidas() {
 function abrirModalAgendamento() {
   if (!dadosAtuais) return;
   const select = document.getElementById("inputHorarioAgendamento");
-  select.innerHTML = dadosAtuais.horarios.map((h) => `<option value="${h}">${h}</option>`).join("");
+  select.innerHTML = (dadosAtuais.horariosDisponiveis || dadosAtuais.horarios).map((h) => `<option value="${escaparHtml(h)}">${escaparHtml(h)}</option>`).join("");
   document.getElementById("inputNomeAgendamento").value = "";
   document.getElementById("inputTelefoneAgendamento").value = "";
   document.getElementById("modalAgendamento").classList.remove("oculto");
@@ -1272,11 +1256,12 @@ async function salvarAgendamentoManual() {
 
 async function retomarIA(telefone) {
   const chave = localStorage.getItem(LS_CHAVE);
-  await fetch("/api/retomar", {
+  const resp = await fetch("/api/retomar", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chave, telefone }),
   });
+  if (!resp.ok) alert((await resp.json()).erro || "Não foi possível retomar");
   atualizar();
 }
 
@@ -1290,6 +1275,7 @@ async function retomarTodasIA() {
   });
   const d = await resp.json();
   if (resp.ok) alert(`IA retomada em ${d.retomados} conversa${d.retomados === 1 ? "" : "s"}.`);
+  else alert(d.erro || "Não foi possível retomar a IA");
   atualizar();
 }
 
@@ -1302,17 +1288,19 @@ async function pausarTodasIA() {
     body: JSON.stringify({ chave }),
   });
   const d = await resp.json();
-  if (resp.ok) alert(`IA parada em ${d.pausados} conversa${d.pausados === 1 ? "" : "s"}.`);
+  if (resp.ok) alert("IA pausada em todas as conversas, inclusive contatos novos, até usar Retomar todas.");
+  else alert(d.erro || "Não foi possível pausar a IA");
   atualizar();
 }
 
 async function pausarIA(telefone) {
   const chave = localStorage.getItem(LS_CHAVE);
-  await fetch("/api/pausar", {
+  const resp = await fetch("/api/pausar", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chave, telefone }),
   });
+  if (!resp.ok) alert((await resp.json()).erro || "Não foi possível pausar");
   atualizar();
 }
 
@@ -1339,7 +1327,7 @@ function gerarCSVDeAgendamentos(agendamentos) {
 
   const porCidade = new Map();
   for (const a of agendamentos) {
-    const cidade = cidadePorHorario.get(a.horario) || "Outros horários (fora da lista padrão)";
+    const cidade = cidadePorHorario.get(a.horario) || extrairCidadeCliente(a.horario) || "Cidade não identificada";
     if (!porCidade.has(cidade)) porCidade.set(cidade, []);
     porCidade.get(cidade).push(a);
   }
@@ -1361,7 +1349,11 @@ function gerarCSVDeAgendamentos(agendamentos) {
       linhas.push([cidade, a.nome, a.telefone, dia, hora]);
     }
   }
-  return linhas.map((l) => l.map((v) => `"${String(v || "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  return linhas.map((l) => l.map((v) => {
+    const valor = String(v || "");
+    const seguro = /^[=+@\-\t\r]/.test(valor) ? "'" + valor : valor;
+    return `"${seguro.replace(/"/g, '""')}"`;
+  }).join(",")).join("\n");
 }
 
 function baixarCSVString(csv, nomeArquivo) {
@@ -1370,31 +1362,49 @@ function baixarCSVString(csv, nomeArquivo) {
   const a = document.createElement("a");
   a.href = url;
   a.download = nomeArquivo;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  a.remove();
+  // O navegador precisa de tempo para iniciar o download, sobretudo no celular.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function exportarCSV() {
-  if (!dadosAtuais) return;
-  baixarCSVString(gerarCSVDeAgendamentos(dadosAtuais.agendamentos), "agendamentos_visao_cidadao.csv");
+  exportarAgendamentos(dadosAtuais?.agendamentos, "agendamentos_visao_cidadao");
 }
 
-function exportarListaEspera() {
+function exportarListaEspera(cidade) {
   if (!dadosAtuais) return;
-  const linhas = [["cidade", "nome", "telefone", "status", "entrada"]];
-  for (const item of dadosAtuais.listaEsperaNovoProgresso || []) {
-    linhas.push([
-      item.cidade || "Novo Progresso-PA",
-      item.nome || "Nome ainda não informado",
-      item.telefone || "",
-      "Aguardando data",
-      item.criadoEm || "",
-    ]);
+  const pessoas = listasDeEspera(dadosAtuais).filter(p => p.cidade === cidade);
+  if (!pessoas.length) { alert("Não há pessoas na lista de espera desta cidade."); return; }
+  const linhas = [["cidade", "nome", "telefone", "situação", "verificado"], ...pessoas.map(p => [cidade, p.nome || "Nome pendente", p.telefone || p.jid || "", "Lista de espera — atendimento ainda não confirmado", p.verificado ? "Sim" : "Não"])];
+  const csv = linhas.map(l => l.map(v => {
+    const valor = String(v);
+    return `"${(/^[=+@\-\t\r]/.test(valor) ? "'" + valor : valor).replace(/"/g, '""')}"`;
+  }).join(",")).join("\n");
+  const nome = cidade.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_");
+  try { baixarCSVString(csv, "lista_espera_" + nome + ".csv"); }
+  catch { alert("Não foi possível baixar a lista. Tente novamente."); }
+}
+
+function exportarCidade(cidade) {
+  if (!dadosAtuais) return;
+  const grupo = dadosAtuais.cidades.find(g => g.cidade === cidade);
+  const agendamentos = dadosAtuais.agendamentos.filter(a => grupo?.horarios.includes(a.horario) || extrairCidadeCliente(a.horario) === cidade);
+  const nome = cidade.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_");
+  exportarAgendamentos(agendamentos, "agendamentos_" + nome);
+}
+
+function exportarAgendamentos(agendamentos, nome) {
+  if (!agendamentos?.length) {
+    alert("Não há agendamentos para exportar nesta lista.");
+    return;
   }
-  const csv = linhas
-    .map((linha) => linha.map((valor) => `"${String(valor || "").replace(/"/g, '""')}"`).join(","))
-    .join("\n");
-  baixarCSVString(csv, "lista_espera_novo_progresso.csv");
+  try {
+    baixarCSVString(gerarCSVDeAgendamentos(agendamentos), nome + ".csv");
+  } catch (e) {
+    alert("Não foi possível baixar a planilha. Tente novamente ou permita downloads neste navegador.");
+  }
 }
 
 function trocarAba(aba) {
@@ -1402,7 +1412,6 @@ function trocarAba(aba) {
   document.querySelectorAll(".aba-btn").forEach((b) => b.classList.toggle("ativa", b.dataset.aba === aba));
   document.getElementById("painelConversas").classList.toggle("oculto", aba !== "conversas");
   document.getElementById("painelAgenda").classList.toggle("oculto", aba !== "agenda");
-  document.getElementById("painelEspera").classList.toggle("oculto", aba !== "espera");
   document.getElementById("painelAtendidas").classList.toggle("oculto", aba !== "atendidas");
   document.getElementById("painelCampanhas").classList.toggle("oculto", aba !== "campanhas");
   document.getElementById("painelConexao").classList.toggle("oculto", aba !== "conexao");
@@ -1710,10 +1719,8 @@ document.getElementById("btnSair").addEventListener("click", () => {
 document.querySelectorAll(".aba-btn").forEach((b) => b.addEventListener("click", () => trocarAba(b.dataset.aba)));
 document.getElementById("buscaConversas").addEventListener("input", renderizarConversas);
 document.getElementById("buscaAgenda").addEventListener("input", renderizarAgenda);
-document.getElementById("buscaEspera").addEventListener("input", renderizarListaEspera);
 document.getElementById("buscaAtendidas").addEventListener("input", renderizarAtendidas);
 document.getElementById("btnExportar").addEventListener("click", exportarCSV);
-document.getElementById("btnExportarEspera").addEventListener("click", exportarListaEspera);
 document.getElementById("btnAtualizarCampanhas").addEventListener("click", buscarCampanhas);
 document.getElementById("seletorPeriodo").addEventListener("change", buscarCampanhas);
 
