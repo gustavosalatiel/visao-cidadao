@@ -62,12 +62,9 @@ test('mesma cidade escrita de jeitos diferentes fica num só município', async 
   assert.equal(porCidade['Medicilândia'].length, 2);
 });
 
-test('Placas (atendimento em negociação): prompt manda direto para a lista reserva e o nome mantém os acentos do cliente', async () => {
-  assert.match(bot.promptSistema(jid), /ATENDIMENTO EM NEGOCIAÇÃO — Placas/);
-  const enviadas = await conversar([marcar('Joao Batista Conceicao', 'Placas-PA')], ['sou de placas, meu nome é joão Batista Conceição']);
-  const salvo = bot.carregarListaReserva().find((a) => a.cidade === 'Placas');
-  assert.equal(salvo.nome, 'João Batista Conceição');
-  assert.match(enviadas.at(-1), /Estamos organizando o atendimento em Placas, ainda sem data confirmada/);
+test('nome na lista reserva mantém os acentos que o cliente escreveu', async () => {
+  await conversar([marcar('Joao Batista Conceicao', 'Altamira-PA')], ['sou de altamira, meu nome é joão Batista Conceição']);
+  assert.ok(bot.carregarListaReserva().some((a) => a.nome === 'João Batista Conceição'));
 });
 
 test('cidade com atendimento ativo nunca entra na lista reserva', async () => {

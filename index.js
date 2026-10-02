@@ -164,7 +164,7 @@ function salvarInteressesRetorno(cidade, nomes, telefone) {
 
 // Localidades com atendimento em negociação: quem procura de lá vai direto para a
 // lista reserva. Quando a data fechar, tire daqui e cadastre os horários no config.js.
-const CIDADES_EM_NEGOCIACAO = ["Placas"];
+const CIDADES_EM_NEGOCIACAO = [];
 
 // Quem mora onde não há atendimento e não consegue ir a nenhuma cidade ativa.
 const ARQ_RESERVA = path.join(DATA_DIR, "lista-reserva.json");
@@ -801,17 +801,13 @@ const COTAS_DE_ABERTURA = Object.fromEntries(
 
 // Exceções combinadas com a equipe. Estes dias não seguem as cotas de abertura.
 // Período que enche primeiro; o outro só recebe gente quando este lotar.
-const PERIODO_PRIORITARIO = {
-  "Quinta-feira 15 de outubro em Novo Progresso-PA": "tarde",
-};
+const PERIODO_PRIORITARIO = {};
 // Dias que alternam manhã e tarde desde o primeiro agendamento.
 const DIAS_ALTERNADOS = ["Quinta-feira 22 de outubro em Uruará-PA"];
 // Dias que só recebem quem pedir expressamente; quem não escolhe dia vai para o padrão.
 // "oculto": o dia nem é oferecido enquanto o padrão tiver vaga.
 const DIAS_SOB_PEDIDO = {
   "Quarta-feira 21 de outubro em Uruará-PA": { padrao: "Quinta-feira 22 de outubro em Uruará-PA", oculto: true },
-  "Sexta-feira 16 de outubro em Novo Progresso-PA": { padrao: "Quinta-feira 15 de outubro em Novo Progresso-PA" },
-  "Sábado 17 de outubro em Novo Progresso-PA": { padrao: "Quinta-feira 15 de outubro em Novo Progresso-PA" },
 };
 for (const dia of [...Object.keys(PERIODO_PRIORITARIO), ...DIAS_ALTERNADOS]) delete COTAS_DE_ABERTURA[dia];
 
@@ -1241,16 +1237,16 @@ ${Date.now() < Date.parse("2026-08-23") ? `2.1. CASO ESPECIAL — OURO PRETO DO 
 ${cidadeTemDataFutura("Moraes de Almeida-PA") ? `2.1.2. CASO ESPECIAL — ITAITUBA/MORAES DE ALMEIDA: Moraes de Almeida é distrito de Itaituba, mas NÃO presuma que quem mora em Itaituba consegue viajar até lá. Diga claramente que o atendimento será em Moraes de Almeida, informe data e endereço e pergunte se consegue se deslocar. Só agende depois do "sim" explícito.` : ""}
 ${cidadeTemDataFutura("Divinópolis-PA") ? `2.1.3. CASO ESPECIAL — RURÓPOLIS/DIVINÓPOLIS: Divinópolis (Km-70) é distrito de Rurópolis, mas NÃO presuma que quem mora em Rurópolis consegue viajar até lá. Diga claramente que o atendimento será em Divinópolis, informe data e endereço e pergunte se consegue se deslocar. Só agende depois do "sim" explícito.` : ""}
 2.1.5. CASO ESPECIAL — PESSOA DISSE SÓ O ESTADO, SEM CIDADE (ex: "sou do Pará", "moro no Acre"): cidades ativas por estado agora: ${resumoPorEstado || "nenhuma"}. Antes de dizer que não tem atendimento, veja se o estado que ela mencionou está nessa lista. Se estiver, NUNCA diga que não tem atendimento nesse estado — pergunte de qual cidade/região específica dentro do estado ela é, citando as cidades ativas daquele estado como opção (ex: "No Pará, estamos atendendo em Novo Progresso e Uruará. Qual dessas cidades fica mais próxima de você?" — use sempre as cidades ativas reais da lista). Só diga que não tem atendimento se o estado dela realmente não tiver nenhuma cidade ativa na lista.
-${cidadeTemDataFutura("Moraes de Almeida-PA") ? `2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA: a data atual é ${hojeNoAcre().toISOString().slice(0, 10)}. Depois de confirmar o local, priorize o dia 16 de setembro SOMENTE se ele ainda aparecer em HORÁRIOS DISPONÍVEIS. Enquanto o dia 16 estiver ativo, ofereça o dia 17 apenas se a pessoa não puder no dia 16. Se o dia 16 já passou, ofereça normalmente o próximo dia disponível, sem exigir recusa de uma data passada. No dia 17, novas vagas são somente à tarde. Nunca ofereça datas passadas. O atendimento é por ordem de chegada.` : ""}
-${cidadeTemDataFutura("Divinópolis-PA") ? `2.1.6. CASO ESPECIAL — DIVINÓPOLIS-PA: existe somente o dia 23 de setembro para pessoas novas. Informe local/data/endereço, confirme se consegue ir e só então agende no dia 23. Não mencione o dia 22.` : ""}
-${cidadeTemDataFutura("Bela Vista do Caracol-PA") ? `2.1.9. PRIORIDADE SOBRE AS REGRAS 2 E 6.1 — BELA VISTA DO CARACOL: Caracol significa Bela Vista do Caracol-PA. Assim que tiver nome completo e cidade, proponha diretamente o sábado 19 e o primeiro horário futuro disponível, informando endereço e perguntando se pode agendar. NÃO pergunte antes se consegue se deslocar, NÃO ofereça inicialmente duas datas e NÃO repita confirmação de local. Inclua ###AGENDAR### com nome e horário como proposta interna: o sistema apresentará a proposta e só salvará após o aceite. Se a pessoa recusar ou pedir sexta/dia18, respeite a escolha e proponha uma opção válida daquele dia. Se pedir outro horário, use a opção solicitada quando disponível. Só apresente alternativas após recusa ou pedido. Nunca imponha sábado contra uma escolha por sexta. Proposta pendente deste contato: ${JSON.stringify(carregarPropostas()[jid] || null)}. Se estiver recusada, não repita a mesma opção: ofereça as alternativas válidas. Se já houver reserva e a pessoa pedir mudança, use ###REAGENDAR###.` : ""}
-${cidadeTemDataFutura("Trairão-PA") ? `2.1.7. CASO ESPECIAL — TRAIRÃO-PA: apresente o atendimento em Trairão e confirme se a pessoa consegue ir. Depois do aceite, priorize o dia 21. O dia 20 é exceção apenas se ela disser que não consegue no dia 21.` : ""}
+${Date.now() < Date.parse("2026-09-18T12:00:00Z") ? `2.1.4. CASO ESPECIAL — MORAES DE ALMEIDA-PA: a data atual é ${hojeNoAcre().toISOString().slice(0, 10)}. Depois de confirmar o local, priorize o dia 16 de setembro SOMENTE se ele ainda aparecer em HORÁRIOS DISPONÍVEIS. Enquanto o dia 16 estiver ativo, ofereça o dia 17 apenas se a pessoa não puder no dia 16. Se o dia 16 já passou, ofereça normalmente o próximo dia disponível, sem exigir recusa de uma data passada. No dia 17, novas vagas são somente à tarde. Nunca ofereça datas passadas. O atendimento é por ordem de chegada.` : ""}
+${Date.now() < Date.parse("2026-09-24T12:00:00Z") ? `2.1.6. CASO ESPECIAL — DIVINÓPOLIS-PA: existe somente o dia 23 de setembro para pessoas novas. Informe local/data/endereço, confirme se consegue ir e só então agende no dia 23. Não mencione o dia 22.` : ""}
+${cidadeTemDataFutura("Bela Vista do Caracol-PA") && Date.now() < Date.parse("2026-09-20T12:00:00Z") ? `2.1.9. PRIORIDADE SOBRE AS REGRAS 2 E 6.1 — BELA VISTA DO CARACOL: Caracol significa Bela Vista do Caracol-PA. Assim que tiver nome completo e cidade, proponha diretamente o sábado 19 e o primeiro horário futuro disponível, informando endereço e perguntando se pode agendar. NÃO pergunte antes se consegue se deslocar, NÃO ofereça inicialmente duas datas e NÃO repita confirmação de local. Inclua ###AGENDAR### com nome e horário como proposta interna: o sistema apresentará a proposta e só salvará após o aceite. Se a pessoa recusar ou pedir sexta/dia18, respeite a escolha e proponha uma opção válida daquele dia. Se pedir outro horário, use a opção solicitada quando disponível. Só apresente alternativas após recusa ou pedido. Nunca imponha sábado contra uma escolha por sexta. Proposta pendente deste contato: ${JSON.stringify(carregarPropostas()[jid] || null)}. Se estiver recusada, não repita a mesma opção: ofereça as alternativas válidas. Se já houver reserva e a pessoa pedir mudança, use ###REAGENDAR###.` : ""}
+${cidadeTemDataFutura("Trairão-PA") && Date.now() < Date.parse("2026-09-22T12:00:00Z") ? `2.1.7. CASO ESPECIAL — TRAIRÃO-PA: apresente o atendimento em Trairão e confirme se a pessoa consegue ir. Depois do aceite, priorize o dia 21. O dia 20 é exceção apenas se ela disser que não consegue no dia 21.` : ""}
 ${NOVO_PROGRESSO_EM_ESPERA ? `2.1.8. PRIORIDADE SOBRE AS REGRAS GERAIS — NOVO PROGRESSO-PA: os agendamentos são para o MÊS DE OUTUBRO; dia, local e horário ainda serão confirmados pelo WhatsApp. Use esta abertura, mantendo os parágrafos:
 ${MENSAGEM_NOVO_PROGRESSO}
 Se já souber o nome completo, registre usando ###LISTA_ESPERA_NOVO_PROGRESSO###{"nome":"NOME COMPLETO"} e confirme a reserva para outubro, nunca um dia, local ou horário marcados. Aceite nomes completos de familiares; tente organizar todos no mesmo horário, mas não garanta isso antes de definir a agenda. NÃO ofereça outra cidade espontaneamente. Só apresente outros locais se a própria pessoa pedir explicitamente atendimento fora de Novo Progresso. Se disser que é longe, retome que haverá atendimento em Novo Progresso no mês de outubro. "Pará" após "Novo Progresso" apenas complementa o estado: não esqueça a cidade. Nunca invente uma data, local ou horário exatos, nem prometa que será no início do mês.` : `2.1.8. NOVO PROGRESSO-PA: a agenda já está definida. Use SOMENTE os dias de Novo Progresso que aparecem em HORÁRIOS DISPONÍVEIS e o endereço cadastrado. Ignore mensagens antigas dizendo que a data e o local ainda seriam definidos. Siga o fluxo normal: nome completo, confirmação do comparecimento e ###AGENDAR###. NÃO use ###LISTA_ESPERA_NOVO_PROGRESSO### para novos agendamentos. Pessoas na lista de espera ainda precisam confirmar dia e comparecimento; não as agende automaticamente só por estarem na lista.`}
 ${CIDADES_EM_NEGOCIACAO.length ? `2.0.2. ATENDIMENTO EM NEGOCIAÇÃO — ${CIDADES_EM_NEGOCIACAO.join(", ")}: para quem mora nessas localidades, informe que estamos organizando um possível atendimento lá, ainda SEM data nem local confirmados, e ofereça incluir a pessoa na LISTA RESERVA dessa localidade para ser avisada por aqui. Não apresente outras cidades, a menos que a própria pessoa pergunte por outro local. Assim que tiver o nome completo, finalize com ###LISTA_RESERVA###{"nome":"NOME COMPLETO","cidade":"NOME DA LOCALIDADE"} (uma marcação por pessoa). Se faltar o nome completo, peça. Não prometa data, prazo nem que o atendimento vai acontecer.` : ""}
 2.1.10. CASO ESPECIAL — URUARÁ-PA: o dia padrão é QUINTA-FEIRA 22 DE OUTUBRO. Enquanto o dia 22 aparecer em HORÁRIOS DISPONÍVEIS, apresente, ofereça e agende SOMENTE o dia 22; NÃO mencione o dia 21 por iniciativa própria (diga "no dia 22 de outubro", nunca "nos dias 21 e 22"). Use o dia 21 apenas se a própria pessoa pedir expressamente o dia 21 ou disser que não pode no dia 22; nesse caso agende no dia 21 normalmente. Se o dia 22 não aparecer mais na lista, ofereça o dia 21.
-2.1.11. CASO ESPECIAL — NOVO PROGRESSO-PA, DIA 15: informe que o atendimento será nos dias 15, 16 e 17 de outubro. Se a pessoa não escolher um dia, agende no dia 15; use o dia 16 ou 17 somente se ela pedir esse dia ou disser que não pode no dia 15. No dia 15 a prioridade é o período da TARDE: o sistema escolhe o horário, não ofereça a manhã do dia 15 por iniciativa própria.
+2.1.11. CASO ESPECIAL — NOVO PROGRESSO-PA: o dia 15 de outubro está LOTADO para novos agendamentos. Para pessoas novas, informe e ofereça SOMENTE os dias 16 e 17 de outubro; se a pessoa não escolher, agende no dia 16. Não mencione o dia 15 como opção. Quem já tem agendamento no dia 15 continua confirmado normalmente.
 2.2. PRIORIDADE EM CADA DIA/CIDADE (exceto os casos especiais 2.1.10 e 2.1.11): agende primeiro 10 pessoas às 08:00, depois 10 às 09:00, depois 10 às 14:00 e depois 10 às 15:00. Respeite dias e períodos fechados. Após preencher essas cotas, distribua entre manhã e tarde, escolhendo o período com menos pessoas e, nele, o horário menos ocupado, incluindo 10:00 e 16:00. O sistema ordena a lista e corrige a escolha antes de salvar: escolha o primeiro horário visível do dia e não pergunte preferência de período. Cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas. Famílias ficam juntas, mesmo que isso deixe os períodos temporariamente desiguais; familiares adicionais ficam no horário já reservado pelo contato.
 3. Se, DEPOIS de você já ter confirmado, a pessoa disser que não consegue comparecer naquele dia, pergunte qual outro DIA disponível fica melhor. Não ofereça nem confirme horário específico, pois o atendimento é por ordem de chegada. Quando ela escolher outro dia, use a marcação ###REAGENDAR### pra trocar o registro anterior pelo novo, como descrito nas REGRAS DO AGENDAMENTO abaixo.
 3.1. NUNCA descarte ou desanime a pessoa por causa de horário. Sempre que for usar um horário fora dos horários redondos da lista (seja porque os redondos encheram, seja porque a pessoa pediu um horário específico depois de recusar o primeiro), a marcação ###AGENDAR### ou ###REAGENDAR### tem que usar EXATAMENTE o texto de um horário daquele mesmo dia/cidade que já está na lista HORÁRIOS DISPONÍVEIS, só trocando a parte final "às HH:MM" — nunca mude a data, o ano, a cidade nem a ordem das palavras, e nunca invente um ano diferente do que está na lista (a lista não tem ano, então você também não escreve ano nenhum).
@@ -1356,7 +1352,7 @@ async function transcreverAudio(base64Audio, mimeType) {
   return (data?.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
 }
 
-async function perguntarIA(historico, jid) {
+async function perguntarIA(historico, jid, instrucaoExtra = "") {
   const contents = historico.map((m) => ({
     role: m.role === "cliente" ? "user" : "model",
     parts: [{ text: m.text }],
@@ -1397,7 +1393,7 @@ Se pedir sexta-feira/dia18 ou outro horário, preencha horario com essa opção 
       carregarListaEsperaNovoProgresso().some((item) => telefonesEquivalentes(item.telefone, resolverTelefone(jid)))) &&
     !CIDADES_CONHECIDAS.some((cidade) => historicoConfirmaDeslocamento(historicoAposNovoProgresso, cidade));
   const generationConfig = { temperature: 0.7, maxOutputTokens: 1000 };
-  let instrucao = promptSistema(jid);
+  let instrucao = promptSistema(jid) + (instrucaoExtra ? `\n${instrucaoExtra}` : "");
   if (reservaNovoProgresso) {
     generationConfig.temperature = 0;
     generationConfig.responseMimeType = "application/json";
@@ -1453,6 +1449,8 @@ function nomeValido(nome) {
 const STEMS_FECHADOS_PARA_NOVOS = [
   "Segunda-feira 14 de setembro em Moraes de Almeida-PA",
   "Terça-feira 22 de setembro em Divinópolis-PA",
+  // 01/10: equipe informou que o dia 15 já tem gente suficiente.
+  "Quinta-feira 15 de outubro em Novo Progresso-PA",
 ];
 
 const PERIODOS_FECHADOS_PARA_NOVOS = [
@@ -1507,6 +1505,15 @@ function formatarDataHora(horario) {
   return { data: horarioEhHoje(horario) ? `Hoje, ${data}` : data, hora };
 }
 
+// A IA disse ao cliente que reservou, mas não mandou a marcação: nada foi gravado.
+function afirmaReservaSemMarcacao(texto, jid) {
+  if (/###(?:AGENDAR|REAGENDAR|LISTA_RESERVA|LISTA_ESPERA_NOVO_PROGRESSO)###/.test(texto || "")) return false;
+  const dito = normalizarBusca(texto);
+  return /\b(?:reservad|agendad|confirmad|marcad)[oa]s?\b/.test(dito) &&
+    /\b(?:prontinho|pronto|deixei|ficou|ficaram|ja esta|esta (?:reservad|agendad|confirmad|marcad))/.test(dito) &&
+    !carregarAgendamentos().some((a) => telefonesEquivalentes(a.telefone, resolverTelefone(jid)) && !horarioJaPassou(a.horario));
+}
+
 function processarResposta(textoIA, jid, { exigirAceite = false, horarioAceito = null } = {}) {
   let texto = textoIA;
   const confirmacoes = [];
@@ -1546,6 +1553,14 @@ function processarResposta(textoIA, jid, { exigirAceite = false, horarioAceito =
     try {
       for (const m of marcacoesReserva) {
         const dados = JSON.parse(m[1]);
+        const cidade = typeof dados.cidade === "string" ? dados.cidade.trim() : "";
+        // Lista reserva é só para onde não há atendimento: cidade ativa volta para o agendamento.
+        const cidadeAtiva = CIDADES_CONHECIDAS.find((c) => cidadeTemDataFutura(c) &&
+          apelidosDaCidade(c).some((a) => textoSemBairroHomonimo(cidade).includes(a)));
+        if (cidadeAtiva) {
+          console.error("⚠️ Lista reserva BLOQUEADA — cidade com atendimento ativo:", cidadeAtiva, "| jid:", jid);
+          return perguntaConfirmacaoDeLocal(cidadeAtiva);
+        }
         let nome = typeof dados.nome === "string" ? dados.nome.trim() : "";
         const posicao = falasCliente.indexOf(normalizarBusca(nome));
         if (!nomeValido(nome) || posicao < 0) {
@@ -1560,14 +1575,6 @@ function processarResposta(textoIA, jid, { exigirAceite = false, horarioAceito =
             if (!doCliente || doCliente.toLowerCase() === letra.toLowerCase()) return letra;
             return letra === letra.toUpperCase() ? doCliente.toUpperCase() : doCliente.toLowerCase();
           }).join("");
-        }
-        const cidade = typeof dados.cidade === "string" ? dados.cidade.trim() : "";
-        // Lista reserva é só para onde não há atendimento: cidade ativa volta para o agendamento.
-        const cidadeAtiva = CIDADES_CONHECIDAS.find((c) => cidadeTemDataFutura(c) &&
-          apelidosDaCidade(c).some((a) => textoSemBairroHomonimo(cidade).includes(a)));
-        if (cidadeAtiva) {
-          console.error("⚠️ Lista reserva BLOQUEADA — cidade com atendimento ativo:", cidadeAtiva, "| jid:", jid);
-          return perguntaConfirmacaoDeLocal(cidadeAtiva);
         }
         if (!porCidade.has(cidade)) porCidade.set(cidade, []);
         porCidade.get(cidade).push(nome);
@@ -1591,9 +1598,7 @@ function processarResposta(textoIA, jid, { exigirAceite = false, horarioAceito =
     const cidadeAtiva = cidadeAtivaDaConversa(jid);
     const prometeuLista = /anotad|anotei|registrei|registrad|incluid|deixei\b/.test(dito) &&
       /lista\s+(?:de\s+)?(?:reserva|espera|interesse)|\bavis(?:o|ar|amos|aremos)\b/.test(dito);
-    const afirmouReserva = /\b(?:reservad|agendad|confirmad|marcad)[oa]s?\b/.test(dito) &&
-      /\b(?:prontinho|pronto|deixei|ficou|ficaram|ja esta|esta (?:reservad|agendad|confirmad|marcad))/.test(dito) &&
-      !carregarAgendamentos().some((a) => telefonesEquivalentes(a.telefone, resolverTelefone(jid)) && !horarioJaPassou(a.horario));
+    const afirmouReserva = afirmaReservaSemMarcacao(texto, jid);
     if ((prometeuLista || afirmouReserva) && cidadeAtiva) return perguntaConfirmacaoDeLocal(cidadeAtiva);
     if (prometeuLista) {
       return "Posso incluir você na nossa lista reserva para avisarmos quando houver atendimento mais próximo. Por favor, informe o nome completo e a cidade onde mora.";
@@ -1663,7 +1668,8 @@ function processarResposta(textoIA, jid, { exigirAceite = false, horarioAceito =
         const horarioDaFamilia = agendamentosAtuais.find(
           (a) =>
             telefonesEquivalentes(a.telefone, telefone) &&
-            stemDoHorario(a.horario) === stem
+            stemDoHorario(a.horario) === stem &&
+            !horarioFechadoParaNovos(a.horario)
         )?.horario;
         if (horarioDaFamilia && horarioJaPassou(horarioDaFamilia)) {
           return "O horário que sua família tinha marcado já passou. Não incluí ninguém em um horário passado. Para manter todos juntos, precisamos combinar um novo horário disponível para a família.";
@@ -1954,7 +1960,19 @@ async function responder(sock, jid, textoRecebido) {
       if (cidadeRetorno) {
         resposta = await responderInteresseRetorno(contextoParaIA(hist), jid, cidadeRetorno, aindaPodeResponder);
       } else {
-        const textoIA = removerEmojis(await perguntarIA(contextoParaIA(hist), jid));
+        let textoIA = removerEmojis(await perguntarIA(contextoParaIA(hist), jid));
+        if (afirmaReservaSemMarcacao(textoIA, jid) && aindaPodeResponder()) {
+          // Uma segunda tentativa evita repetir ao cliente a pergunta que ele já respondeu.
+          console.error("⚠️ IA confirmou reserva sem a marcação; pedindo de novo. jid:", jid);
+          try {
+            textoIA = removerEmojis(await perguntarIA(contextoParaIA(hist), jid,
+              "ATENÇÃO: sua resposta anterior disse que a reserva foi feita, mas não trouxe a marcação ###AGENDAR###, então nada foi gravado. Se a pessoa já confirmou que consegue comparecer e você sabe o nome completo dela, responda de novo INCLUINDO a marcação ###AGENDAR### com o nome e o horário. Se ainda faltar o nome completo ou a confirmação do local, peça somente o que falta e não diga que reservou."));
+          } catch (e) {
+            // Sem a segunda resposta, segue com a primeira: processarResposta impede a confirmação falsa.
+            console.error("Segunda tentativa da IA falhou:", e.message);
+          }
+          if (!aindaPodeResponder()) return;
+        }
         if (!aindaPodeResponder()) return;
         resposta = processarResposta(textoIA, jid, { exigirAceite: true });
       }
@@ -2265,6 +2283,7 @@ function iniciarServidorHTTP(getSock) {
       horarios: CFG.HORARIOS,
       horariosDisponiveis: CFG.HORARIOS.filter(h => horarioValido(h, agendamentos)),
       cidades: agruparHorariosPorCidade(CFG.HORARIOS),
+      horariosPassados: CFG.HORARIOS.filter((h) => horarioJaPassou(h)),
       agendamentos,
       listaEsperaNovoProgresso: carregarListaEsperaNovoProgresso().map(p => identificarEspera(p, "novo-progresso")),
       listaEsperaRetornos: carregarListaRetornos().map(p => identificarEspera(p, "retornos")),

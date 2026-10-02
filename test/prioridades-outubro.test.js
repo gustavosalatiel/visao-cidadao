@@ -32,18 +32,19 @@ const marcar = (nome, horario) => '###AGENDAR###' + JSON.stringify({ nome, horar
 const hora = (a) => a.horario.slice(-5);
 const periodo = (a) => (Number(hora(a).slice(0, 2)) < 12 ? 'manhã' : 'tarde');
 
-test('Novo Progresso dia 15 enche a tarde antes de usar a manhã', () => {
-  for (let i = 0; i < 12; i++) bot.processarResposta(marcar(`Pessoa Tarde ${i}`, `${NP15} às 08:00`), jids[i]);
-  const dia15 = agenda().filter((a) => a.horario.startsWith(NP15));
-  assert.equal(dia15.length, 12);
-  assert.ok(dia15.every((a) => periodo(a) === 'tarde'), JSON.stringify(dia15.map(hora)));
-  assert.deepEqual([...new Set(dia15.map(hora))].sort(), ['14:00', '15:00', '16:00']);
+test('Novo Progresso dia 15 está fechado para novos: oferece 16 e 17 e não grava no dia 15', () => {
+  const texto = bot.processarResposta(marcar('Pessoa Dia Quinze', `${NP15} às 14:00`), jids[0]);
+  assert.equal(agenda().some((a) => a.nome === 'Pessoa Dia Quinze'), false);
+  assert.match(texto, /Sexta-feira 16 de outubro e Sábado 17 de outubro/);
+  assert.doesNotMatch(texto, /Quinta-feira 15/);
+  assert.doesNotMatch(bot.promptSistema(jids[0]), new RegExp(`- ${NP15}`));
 });
 
-test('Novo Progresso sem dia escolhido vai para o dia 15, mesmo se a IA marcar outro dia', () => {
-  bot.processarResposta(marcar('Pessoa Sem Escolha', `${NP16} às 08:00`), jids[21]);
-  const a = agenda().find((x) => x.nome === 'Pessoa Sem Escolha');
-  assert.ok(a.horario.startsWith(NP15) && periodo(a) === 'tarde', a.horario);
+test('familiar de quem já está no dia 15 não reabre o dia 15', () => {
+  fs.writeFileSync(arq, JSON.stringify([...agenda(), { nome: 'Titular Dia Quinze', telefone: jids[1].split('@')[0], horario: `${NP15} às 08:00` }]));
+  const texto = bot.processarResposta(marcar('Filho Do Titular', `${NP15} às 08:00`), jids[1]);
+  assert.equal(agenda().some((a) => a.nome === 'Filho Do Titular'), false);
+  assert.match(texto, /Sexta-feira 16 de outubro/);
 });
 
 test('Novo Progresso dia 16 para quem pede segue a regra normal (manhã primeiro)', () => {

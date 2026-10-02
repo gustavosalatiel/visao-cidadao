@@ -25,9 +25,9 @@ for(const [i,[cidade,dias,rua]] of casos.entries()){
      const semana=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'][new Date(Date.UTC(2026,9,dia)).getUTCDay()];
      assert.ok(h.startsWith(semana));
    }
-   const resposta=bot.processarResposta('###AGENDAR###'+JSON.stringify({nome:'Pessoa Teste',horario:horarios[0]}),jids[i]);
+   const resposta=bot.processarResposta('###AGENDAR###'+JSON.stringify({nome:'Pessoa Teste',horario:horarios[cidade==='Novo Progresso-PA'?6:0]}),jids[i]);
    assert.ok(resposta.includes(rua),resposta);
-   assert.ok(bot.carregarAgendamentos().some(a=>a.telefone===jids[i].split('@')[0] && a.horario===horarios[cidade==='Novo Progresso-PA'?3:0]));
+   assert.ok(bot.carregarAgendamentos().some(a=>a.telefone===jids[i].split('@')[0] && a.horario===horarios[cidade==='Novo Progresso-PA'?6:0]));
  });
 }
 test('Novo Progresso usa agenda definida e preserva espera sem converter em agendamento',()=>{

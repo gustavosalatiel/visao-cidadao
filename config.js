@@ -9,12 +9,13 @@ module.exports = {
     "Acrelândia-AC": "Igreja Assembleia de Deus Brás Madureira — Rua Minas Gerais",
     "Guajará-Mirim-RO": "SINTERO — Avenida 15 de Novembro (de frente ao Hotel Quinzão)",
     "Distrito de Extrema-RO": "Igreja Missionária IMUB — Rua Boa Esperança, Bairro Planalto",
-    "Moraes de Almeida-PA": "Escola César Almeida — Distrito de Moraes Almeida, s/n, Rodovia BR-163, km 1.185, Itaituba-PA",
+    "Moraes de Almeida-PA": "Escola César Almeida — Rodovia BR-163, km 01, Distrito de Moraes de Almeida",
     "Divinópolis-PA": "PID Ponto de Inclusão Digital — Vila de Divinópolis, no Km 70",
     "Bela Vista do Caracol-PA": "EMEIF Bela Vista de Caracol — TV Principal, s/n, Distrito de Caracol, Zona Rural, Trairão-PA",
     "Trairão-PA": "Escola de Educação — Rua 13 de Dezembro, Trairão-PA",
     "Uruará-PA": "Igreja Pentecostal Deus é Amor — Rua Benjamim Constant, 506, Uruará-PA",
     "Castelo dos Sonhos-PA": "Igreja Pentecostal Sonho de Deus — Rua Ouro Verde",
+    "Placas-PA": "Centro Médico Alcântara — Avenida Perimetral Sul, Centro (próximo à Padaria Galvão)",
     "Novo Progresso-PA": "Igreja Assembleia de Deus Pentecostal Missionária — Rua Tapajós, 1031, Bairro Bela Vista, no final do asfalto",
     "Cachoeira da Serra-PA": "Igreja Pentecostal Sonhos de Deus — Avenida 3 de Maio, ao lado da loja de material de construção Glória",
   },
@@ -56,6 +57,18 @@ module.exports = {
     "Sábado 17 de outubro em Novo Progresso-PA às 14:00",
     "Sábado 17 de outubro em Novo Progresso-PA às 15:00",
     "Sábado 17 de outubro em Novo Progresso-PA às 16:00",
+    "Domingo 18 de outubro em Moraes de Almeida-PA às 08:00",
+    "Domingo 18 de outubro em Moraes de Almeida-PA às 09:00",
+    "Domingo 18 de outubro em Moraes de Almeida-PA às 10:00",
+    "Domingo 18 de outubro em Moraes de Almeida-PA às 14:00",
+    "Domingo 18 de outubro em Moraes de Almeida-PA às 15:00",
+    "Domingo 18 de outubro em Moraes de Almeida-PA às 16:00",
+    "Terça-feira 20 de outubro em Placas-PA às 08:00",
+    "Terça-feira 20 de outubro em Placas-PA às 09:00",
+    "Terça-feira 20 de outubro em Placas-PA às 10:00",
+    "Terça-feira 20 de outubro em Placas-PA às 14:00",
+    "Terça-feira 20 de outubro em Placas-PA às 15:00",
+    "Terça-feira 20 de outubro em Placas-PA às 16:00",
     "Quinta-feira 13 de agosto em Sena Madureira-AC às 08:00",
     "Quinta-feira 13 de agosto em Sena Madureira-AC às 09:00",
     "Quinta-feira 13 de agosto em Sena Madureira-AC às 10:00",
@@ -190,7 +203,7 @@ module.exports = {
 - É um mutirão itinerante: o atendimento acontece somente nas cidades e datas da lista de horários disponíveis.
 - A pessoa deve escolher a data e a cidade da lista de horários disponíveis mais perto dela.
 - Priorize 10 pessoas às 08:00, 10 às 09:00, 10 às 14:00 e 10 às 15:00 por dia/cidade; depois distribua entre manhã e tarde, respeitando a capacidade e os períodos fechados. Famílias ficam no mesmo horário.
-- Novo Progresso-PA: atendimento em 15, 16 e 17 de outubro na Igreja Assembleia de Deus Pentecostal Missionária, Rua Tapajós, 1031, Bairro Bela Vista, no final do asfalto. Use as vagas disponíveis e confirme o comparecimento antes de agendar. Os nomes da lista de espera não são agendamentos confirmados.
+- Novo Progresso-PA: atendimento em 15, 16 e 17 de outubro (o dia 15 está lotado: para novos agendamentos, ofereça apenas 16 e 17) na Igreja Assembleia de Deus Pentecostal Missionária, Rua Tapajós, 1031, Bairro Bela Vista, no final do asfalto. Use as vagas disponíveis e confirme o comparecimento antes de agendar. Os nomes da lista de espera não são agendamentos confirmados.
 - Depois do exame, o médico passa um atestado de horas pra pessoa levar no trabalho, na escola ou onde precisar, comprovando a ausência.
 - Exames e avaliações que fazemos: retinografia, biomicroscopia, tonometria, refração computadorizada, avaliação cirúrgica, encaminhamentos e laudos cirúrgicos.
 `,

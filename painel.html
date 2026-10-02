@@ -1108,7 +1108,16 @@ async function marcarEsperaVerificada(input) {
 
 function montarBlocoCidade(cidade, ctx, incluirEspera = false) {
   const { dados, porHorario, outrosPorCidade, bate, bateLista } = ctx;
-  const grupoOriginal = dados.cidades.find((g) => g.cidade === cidade);
+  const grupoCompleto = dados.cidades.find((g) => g.cidade === cidade);
+  // Cidade que volta a ter atendimento: a agenda mostra só os dias futuros e
+  // "Cidades atendidas" mostra só os dias que já passaram.
+  const passados = new Set(dados.horariosPassados || []);
+  const horariosDaAba = grupoCompleto && dados.horariosPassados
+    ? grupoCompleto.horarios.filter((h) => (incluirEspera ? !passados.has(h) : passados.has(h)))
+    : grupoCompleto?.horarios;
+  const grupoOriginal = grupoCompleto && dados.horariosPassados
+    ? { ...grupoCompleto, horarios: horariosDaAba, passada: incluirEspera ? !horariosDaAba.length : horariosDaAba.length > 0 }
+    : grupoCompleto;
   const somenteEspera = incluirEspera && grupoOriginal?.passada;
   const grupo = somenteEspera ? null : grupoOriginal;
   const linhasHorario = grupo

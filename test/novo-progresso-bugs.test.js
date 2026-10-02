@@ -31,7 +31,7 @@ test('"Bairro Bela Vista" no endereço não anula o "Sim" do cliente de Novo Pro
   const jid = novoJid();
   const enviadas = await conversar(jid, [
     ['Andreia Souza Lima, Novo Progresso', PERGUNTA_IA],
-    ['Sim', 'Seu exame gratuito está reservado. Veja os detalhes abaixo:\n' + marcar('Andreia Souza Lima', 'Quinta-feira 15 de outubro em Novo Progresso-PA às 08:00')],
+    ['Sim', 'Seu exame gratuito está reservado. Veja os detalhes abaixo:\n' + marcar('Andreia Souza Lima', 'Sexta-feira 16 de outubro em Novo Progresso-PA às 08:00')],
   ]);
   assert.match(enviadas.at(-1), /Agendamento confirmado/);
   assert.equal(agenda().filter((a) => a.nome === 'Andreia Souza Lima').length, 1);
@@ -68,7 +68,7 @@ test('IA dizer "deixei reservado" sem marcação não vira oferta de lista reser
 
 test('dia que não existe na agenda informa os dias com vaga na mesma cidade', () => {
   const texto = bot.processarResposta(marcar('Fulano de Tal', 'Domingo 18 de outubro em Novo Progresso-PA às 08:00'), novoJid());
-  assert.match(texto, /Quinta-feira 15 de outubro, Sexta-feira 16 de outubro e Sábado 17 de outubro/);
+  assert.match(texto, /Sexta-feira 16 de outubro e Sábado 17 de outubro/);
   assert.doesNotMatch(texto, /Uruará/);
 });
 
@@ -83,7 +83,7 @@ test('recusa de agendar familiar recebe sempre o convite fixo com o link, sem ch
     const nome = `Tereza Melo ${recusa.length}${n} Prado`;
     const enviadas = await conversar(jid, [
       [`${nome}, Novo Progresso`, PERGUNTA_IA],
-      ['Sim', 'Reservado.\n' + marcar(nome, 'Quinta-feira 15 de outubro em Novo Progresso-PA às 14:00')],
+      ['Sim', 'Reservado.\n' + marcar(nome, 'Sexta-feira 16 de outubro em Novo Progresso-PA às 08:00')],
       [recusa, 'RESPOSTA DA IA QUE NÃO DEVE SER USADA'],
     ]);
     assert.match(enviadas.at(-2), /Quer agendar para mais algum familiar também\?$/);
@@ -95,7 +95,7 @@ test('quem quer agendar familiar não recebe o convite do link no lugar do agend
   const jid = novoJid();
   const enviadas = await conversar(jid, [
     ['Beatriz Lopes Farias, Novo Progresso', PERGUNTA_IA],
-    ['Sim', 'Reservado.\n' + marcar('Beatriz Lopes Farias', 'Quinta-feira 15 de outubro em Novo Progresso-PA às 14:00')],
+    ['Sim', 'Reservado.\n' + marcar('Beatriz Lopes Farias', 'Sexta-feira 16 de outubro em Novo Progresso-PA às 08:00')],
     ['sim, meu marido', 'Por favor, informe o nome completo do familiar.'],
   ]);
   assert.equal(enviadas.at(-1), 'Por favor, informe o nome completo do familiar.');
