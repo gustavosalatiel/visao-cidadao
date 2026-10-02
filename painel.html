@@ -382,6 +382,9 @@
   .lista-espera summary { background: var(--ambar-fraco); color: #713f12; min-height: 44px; }
   .lista-espera summary span:first-child { white-space: normal; overflow-wrap: anywhere; }
   .aviso-espera { padding: 12px 16px; margin: 0; color: #713f12; line-height: 1.5; }
+  .obs-agendamento { flex-basis: 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: #FEF3C7; color: #713f12; font-size: 13px; font-weight: 600; }
+  .badge-avisar { background: #F59E0B; color: #fff; }
+  .lista-pessoas li:has(> .obs-agendamento) { flex-wrap: wrap; }
   .lista-espera .lista-pessoas li { flex-wrap: wrap; gap: 8px; }
   .horario-sub.fora-padrao .badge {
     background: #FB923C;
@@ -980,8 +983,22 @@ function linhaAgendamento(p, comHorario) {
         <span class="nome-pessoa">${rotulo}</span>
       </label>
       <span class="tel">${escaparHtml(p.telefone)}</span>
+      ${p.obs ? `<span class="obs-agendamento">⚠ ${escaparHtml(p.obs)}
+        <button class="btn-fraco" data-criado="${escaparHtml(p.criadoEm)}" onclick="limparObs(this.dataset.criado)">Avisado</button></span>` : ""}
     </li>
   `;
+}
+
+async function limparObs(criadoEm) {
+  try {
+    const resp = await fetch("/api/agendamento-obs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chave: localStorage.getItem(LS_CHAVE), criadoEm, obs: "" }),
+    });
+    if (!resp.ok) throw new Error((await resp.json()).erro || "Não foi possível salvar");
+    atualizar();
+  } catch (e) { alert(e.message); }
 }
 
 async function marcarTransferido(criadoEm, transferido) {
@@ -1179,12 +1196,14 @@ function montarBlocoCidade(cidade, ctx, incluirEspera = false) {
 
   const totalHorarios = grupo ? grupo.horarios.reduce((soma, h) => soma + (porHorario.get(h) || []).length, 0) : 0;
   const totalCidade = totalHorarios + foraDoPadrao.length;
+  const paraAvisar = (dados.agendamentos || []).filter((a) => a.obs && (grupo?.horarios.includes(a.horario) || foraDoPadrao.includes(a))).length;
   const chaveCidade = `cidade:${cidade}`;
   const html = `
     <details class="municipio-grupo" data-key="${escaparHtml(chaveCidade)}" ${estaAberto(chaveCidade, true) ? "open" : ""}>
       <summary>
         <span>📍 ${escaparHtml(cidade)}${totalCidade === 0 && esperas.length && !reserva ? " — Lista de espera" : ""}</span>
         <span class="badge-cidade">${totalCidade ? `${totalCidade} agendado${totalCidade === 1 ? "" : "s"}` : esperas.length || reserva ? "" : "0 agendados"}${totalCidade && esperas.length ? " · " : ""}${esperas.length || reserva ? `${esperas.length} ${rotuloEspera}` : ""}</span>
+        ${paraAvisar ? `<span class="badge-cidade badge-avisar">⚠ ${paraAvisar} para avisar</span>` : ""}
       </summary>
       ${totalCidade ? `<div style="padding:12px 16px;">
         <button class="btn-fraco" data-cidade="${escaparHtml(cidade)}" onclick="exportarCidade(this.dataset.cidade)">⬇ Exportar planilha desta cidade</button>

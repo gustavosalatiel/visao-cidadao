@@ -60,3 +60,18 @@ test('contexto mantém mais de 80 falas recentes sem confundir mensagens da equi
   const contexto=bot.contextoParaIA(mensagens);
   assert.equal(contexto.length,100);assert.equal(contexto[0].text,'Mensagem 0');
 });
+
+test('observação no agendamento: grava, aparece nos dados do painel e "Avisado" remove', async () => {
+  const servidor = bot.iniciarServidorHTTP(() => null);
+  await new Promise((resolve) => servidor.listening ? resolve() : servidor.once('listening', resolve));
+  const url = 'http://127.0.0.1:' + servidor.address().port;
+  const post = (rota, dados) => fetch(url + rota, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chave: 'teste-local', ...dados }) });
+  try {
+    const { criadoEm } = (await (await fetch(url + '/api/dados?chave=teste-local')).json()).agendamentos[0];
+    assert.equal((await post('/api/agendamento-obs', { criadoEm, obs: 'Avisar a pessoa' })).status, 200);
+    assert.equal((await (await fetch(url + '/api/dados?chave=teste-local')).json()).agendamentos[0].obs, 'Avisar a pessoa');
+    assert.equal((await post('/api/agendamento-obs', { criadoEm, obs: '' })).status, 200);
+    assert.equal((await (await fetch(url + '/api/dados?chave=teste-local')).json()).agendamentos[0].obs, undefined);
+    assert.equal((await post('/api/agendamento-obs', { chave: 'errada', criadoEm, obs: 'x' })).status, 401);
+  } finally { servidor.close(); }
+});

@@ -2435,6 +2435,20 @@ function iniciarServidorHTTP(getSock) {
     res.json({ ok: true });
   });
 
+  // Observação da equipe num agendamento (ex.: "avisar a pessoa"); texto vazio remove.
+  app.post("/api/agendamento-obs", (req, res) => {
+    const { chave, criadoEm, obs } = req.body || {};
+    if (chave !== CFG.CHAVE_API) return res.status(401).json({ erro: "Chave inválida" });
+    if (!criadoEm || typeof obs !== "string" || obs.length > 300) return res.status(400).json({ erro: "Informe criadoEm e uma observação de até 300 caracteres" });
+    const lista = carregarAgendamentos();
+    const item = lista.find((a) => a.criadoEm === criadoEm);
+    if (!item) return res.status(404).json({ erro: "Agendamento não encontrado" });
+    if (obs.trim()) item.obs = obs.trim();
+    else delete item.obs;
+    gravarJsonAtomico(ARQ_AGENDAMENTOS, lista);
+    res.json({ ok: true });
+  });
+
   function telefoneParaJid(telefone) {
     return jidDaConversa(telefone);
   }
