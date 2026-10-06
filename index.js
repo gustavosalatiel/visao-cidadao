@@ -803,12 +803,25 @@ const COTAS_DE_ABERTURA = Object.fromEntries(
 // Período que enche primeiro; o outro só recebe gente quando este lotar.
 const PERIODO_PRIORITARIO = {};
 // Dias que alternam manhã e tarde desde o primeiro agendamento.
-const DIAS_ALTERNADOS = ["Quinta-feira 22 de outubro em Uruará-PA"];
+const DIAS_ALTERNADOS = [
+  "Quinta-feira 22 de outubro em Uruará-PA",
+  // 06/10: Novo Progresso foca 15 e 17, alternando 08:00 e 14:00 (HORAS_PERMITIDAS).
+  "Quinta-feira 15 de outubro em Novo Progresso-PA",
+  "Sábado 17 de outubro em Novo Progresso-PA",
+];
+// Horas que aceitam gente nova nesses dias; as demais ficam fechadas para novos.
+const HORAS_PERMITIDAS = {
+  "Quinta-feira 15 de outubro em Novo Progresso-PA": ["08:00", "14:00"],
+  "Sábado 17 de outubro em Novo Progresso-PA": ["08:00", "14:00"],
+};
 // Dias que só recebem quem pedir expressamente; quem não escolhe dia vai para o padrão.
 // "oculto": o dia nem é oferecido enquanto o padrão tiver vaga.
 const DIAS_SOB_PEDIDO = {
   "Quarta-feira 21 de outubro em Uruará-PA": { padrao: "Quinta-feira 22 de outubro em Uruará-PA", oculto: true },
+  // 06/10: dia 16 em pausa; só entra quem pedir o dia 16 (encaixe).
+  "Sexta-feira 16 de outubro em Novo Progresso-PA": { padrao: ["Quinta-feira 15 de outubro em Novo Progresso-PA", "Sábado 17 de outubro em Novo Progresso-PA"], oculto: true },
 };
+const padroesDoDia = (regra) => [].concat(regra.padrao);
 for (const dia of [...Object.keys(PERIODO_PRIORITARIO), ...DIAS_ALTERNADOS]) delete COTAS_DE_ABERTURA[dia];
 
 function diaTemVaga(stem, agendamentos) {
@@ -818,7 +831,7 @@ function diaTemVaga(stem, agendamentos) {
 // Um dia oculto fica fora das ofertas enquanto o dia padrão tiver vaga.
 function diaSobPedidoOculto(horario, agendamentos = carregarAgendamentos()) {
   const regra = DIAS_SOB_PEDIDO[stemDoHorario(horario)];
-  return !!regra?.oculto && diaTemVaga(regra.padrao, agendamentos);
+  return !!regra?.oculto && padroesDoDia(regra).some((p) => diaTemVaga(p, agendamentos));
 }
 
 // "dia 21", "21/10", "quarta": o cliente citou o dia deste atendimento.
@@ -833,12 +846,15 @@ function aplicarDiaSobPedido(horarioSolicitado, jid) {
   const regra = DIAS_SOB_PEDIDO[stem];
   if (!regra) return horarioSolicitado;
   const falas = (historicos.get(jid) || []).filter((m) => m.role === "cliente").slice(-6).map((m) => normalizarBusca(m.text));
-  if (falas.some((t) => regexDoDia(stem).test(t)) || clienteRecusouData(jid, regexDoDia(regra.padrao))) return horarioSolicitado;
+  if (falas.some((t) => regexDoDia(stem).test(t)) || padroesDoDia(regra).every((p) => clienteRecusouData(jid, regexDoDia(p)))) return horarioSolicitado;
   const agendamentos = carregarAgendamentos();
   // Familiar de quem já está neste dia fica junto, sem precisar pedir o dia de novo.
   if (agendamentos.some((a) => telefonesEquivalentes(a.telefone, resolverTelefone(jid)) && stemDoHorario(a.horario) === stem)) return horarioSolicitado;
-  const noPadrao = CFG.HORARIOS.find((h) => stemDoHorario(h) === regra.padrao && horarioValido(h, agendamentos));
-  if (noPadrao) console.log("📌 Prioridade aplicada:", stemDoHorario(horarioSolicitado), "->", regra.padrao);
+  const noPadrao = padroesDoDia(regra)
+    .filter((p) => !clienteRecusouData(jid, regexDoDia(p)))
+    .map((p) => CFG.HORARIOS.find((h) => stemDoHorario(h) === p && horarioValido(h, agendamentos)))
+    .find(Boolean);
+  if (noPadrao) console.log("📌 Prioridade aplicada:", stemDoHorario(horarioSolicitado), "->", stemDoHorario(noPadrao));
   return noPadrao || horarioSolicitado;
 }
 
@@ -1246,7 +1262,7 @@ ${MENSAGEM_NOVO_PROGRESSO}
 Se já souber o nome completo, registre usando ###LISTA_ESPERA_NOVO_PROGRESSO###{"nome":"NOME COMPLETO"} e confirme a reserva para outubro, nunca um dia, local ou horário marcados. Aceite nomes completos de familiares; tente organizar todos no mesmo horário, mas não garanta isso antes de definir a agenda. NÃO ofereça outra cidade espontaneamente. Só apresente outros locais se a própria pessoa pedir explicitamente atendimento fora de Novo Progresso. Se disser que é longe, retome que haverá atendimento em Novo Progresso no mês de outubro. "Pará" após "Novo Progresso" apenas complementa o estado: não esqueça a cidade. Nunca invente uma data, local ou horário exatos, nem prometa que será no início do mês.` : `2.1.8. NOVO PROGRESSO-PA: a agenda já está definida. Use SOMENTE os dias de Novo Progresso que aparecem em HORÁRIOS DISPONÍVEIS e o endereço cadastrado. Ignore mensagens antigas dizendo que a data e o local ainda seriam definidos. Siga o fluxo normal: nome completo, confirmação do comparecimento e ###AGENDAR###. NÃO use ###LISTA_ESPERA_NOVO_PROGRESSO### para novos agendamentos. Pessoas na lista de espera ainda precisam confirmar dia e comparecimento; não as agende automaticamente só por estarem na lista.`}
 ${CIDADES_EM_NEGOCIACAO.length ? `2.0.2. ATENDIMENTO EM NEGOCIAÇÃO — ${CIDADES_EM_NEGOCIACAO.join(", ")}: para quem mora nessas localidades, informe que estamos organizando um possível atendimento lá, ainda SEM data nem local confirmados, e ofereça incluir a pessoa na LISTA RESERVA dessa localidade para ser avisada por aqui. Não apresente outras cidades, a menos que a própria pessoa pergunte por outro local. Assim que tiver o nome completo, finalize com ###LISTA_RESERVA###{"nome":"NOME COMPLETO","cidade":"NOME DA LOCALIDADE"} (uma marcação por pessoa). Se faltar o nome completo, peça. Não prometa data, prazo nem que o atendimento vai acontecer.` : ""}
 2.1.10. CASO ESPECIAL — URUARÁ-PA: o dia padrão é QUINTA-FEIRA 22 DE OUTUBRO. Enquanto o dia 22 aparecer em HORÁRIOS DISPONÍVEIS, apresente, ofereça e agende SOMENTE o dia 22; NÃO mencione o dia 21 por iniciativa própria (diga "no dia 22 de outubro", nunca "nos dias 21 e 22"). Use o dia 21 apenas se a própria pessoa pedir expressamente o dia 21 ou disser que não pode no dia 22; nesse caso agende no dia 21 normalmente. Se o dia 22 não aparecer mais na lista, ofereça o dia 21.
-2.1.11. CASO ESPECIAL — NOVO PROGRESSO-PA: o dia 15 de outubro está LOTADO para novos agendamentos. Para pessoas novas, informe e ofereça SOMENTE os dias 16 e 17 de outubro; se a pessoa não escolher, agende no dia 16. Não mencione o dia 15 como opção. Quem já tem agendamento no dia 15 continua confirmado normalmente.
+2.1.11. CASO ESPECIAL — NOVO PROGRESSO-PA: para pessoas novas, ofereça os dias 15 e 17 de outubro (quinta-feira 15 e sábado 17); se a pessoa não escolher, agende no dia 15. O sistema escolhe o horário. O dia 16 (sexta-feira) está em pausa: NÃO o ofereça; use o dia 16 somente se a própria pessoa pedir o dia 16 ou disser que não pode nos dias 15 e 17. Quem já tem agendamento continua confirmado normalmente.
 2.2. PRIORIDADE EM CADA DIA/CIDADE (exceto os casos especiais 2.1.10 e 2.1.11): agende primeiro 10 pessoas às 08:00, depois 10 às 09:00, depois 10 às 14:00 e depois 10 às 15:00. Respeite dias e períodos fechados. Após preencher essas cotas, distribua entre manhã e tarde, escolhendo o período com menos pessoas e, nele, o horário menos ocupado, incluindo 10:00 e 16:00. O sistema ordena a lista e corrige a escolha antes de salvar: escolha o primeiro horário visível do dia e não pergunte preferência de período. Cada horário tem no máximo ${VAGAS_POR_HORARIO} vagas. Famílias ficam juntas, mesmo que isso deixe os períodos temporariamente desiguais; familiares adicionais ficam no horário já reservado pelo contato.
 3. Se, DEPOIS de você já ter confirmado, a pessoa disser que não consegue comparecer naquele dia, pergunte qual outro DIA disponível fica melhor. Não ofereça nem confirme horário específico, pois o atendimento é por ordem de chegada. Quando ela escolher outro dia, use a marcação ###REAGENDAR### pra trocar o registro anterior pelo novo, como descrito nas REGRAS DO AGENDAMENTO abaixo.
 3.1. NUNCA descarte ou desanime a pessoa por causa de horário. Sempre que for usar um horário fora dos horários redondos da lista (seja porque os redondos encheram, seja porque a pessoa pediu um horário específico depois de recusar o primeiro), a marcação ###AGENDAR### ou ###REAGENDAR### tem que usar EXATAMENTE o texto de um horário daquele mesmo dia/cidade que já está na lista HORÁRIOS DISPONÍVEIS, só trocando a parte final "às HH:MM" — nunca mude a data, o ano, a cidade nem a ordem das palavras, e nunca invente um ano diferente do que está na lista (a lista não tem ano, então você também não escreve ano nenhum).
@@ -1449,8 +1465,6 @@ function nomeValido(nome) {
 const STEMS_FECHADOS_PARA_NOVOS = [
   "Segunda-feira 14 de setembro em Moraes de Almeida-PA",
   "Terça-feira 22 de setembro em Divinópolis-PA",
-  // 01/10: equipe informou que o dia 15 já tem gente suficiente.
-  "Quinta-feira 15 de outubro em Novo Progresso-PA",
 ];
 
 const PERIODOS_FECHADOS_PARA_NOVOS = [
@@ -1469,6 +1483,7 @@ function atendimentoPorOrdemDeChegada(horario) {
 function horarioFechadoParaNovos(horario) {
   const semHora = stemDoHorario(horario);
   if (STEMS_FECHADOS_PARA_NOVOS.includes(semHora)) return true;
+  if (HORAS_PERMITIDAS[semHora] && !HORAS_PERMITIDAS[semHora].includes(normalizarHora(horario))) return true;
   return PERIODOS_FECHADOS_PARA_NOVOS.some(
     (item) => item.stem === semHora && item.periodo === periodoDoHorario(horario)
   );

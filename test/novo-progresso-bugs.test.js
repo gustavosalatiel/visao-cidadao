@@ -68,7 +68,7 @@ test('IA dizer "deixei reservado" sem marcação não vira oferta de lista reser
 
 test('dia que não existe na agenda informa os dias com vaga na mesma cidade', () => {
   const texto = bot.processarResposta(marcar('Fulano de Tal', 'Domingo 18 de outubro em Novo Progresso-PA às 08:00'), novoJid());
-  assert.match(texto, /Sexta-feira 16 de outubro e Sábado 17 de outubro/);
+  assert.match(texto, /Quinta-feira 15 de outubro e Sábado 17 de outubro/);
   assert.doesNotMatch(texto, /Uruará/);
 });
 

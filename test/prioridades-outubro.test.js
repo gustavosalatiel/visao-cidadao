@@ -9,6 +9,7 @@ process.env.AUTH_DIR = path.join(process.env.DATA_DIR, 'auth');
 delete process.env.LIMPAR_AUTH;
 const NP15 = 'Quinta-feira 15 de outubro em Novo Progresso-PA';
 const NP16 = 'Sexta-feira 16 de outubro em Novo Progresso-PA';
+const NP17 = 'Sábado 17 de outubro em Novo Progresso-PA';
 const U21 = 'Quarta-feira 21 de outubro em Uruará-PA';
 const U22 = 'Quinta-feira 22 de outubro em Uruará-PA';
 let n = 0;
@@ -32,19 +33,27 @@ const marcar = (nome, horario) => '###AGENDAR###' + JSON.stringify({ nome, horar
 const hora = (a) => a.horario.slice(-5);
 const periodo = (a) => (Number(hora(a).slice(0, 2)) < 12 ? 'manhã' : 'tarde');
 
-test('Novo Progresso dia 15 está fechado para novos: oferece 16 e 17 e não grava no dia 15', () => {
-  const texto = bot.processarResposta(marcar('Pessoa Dia Quinze', `${NP15} às 14:00`), jids[0]);
-  assert.equal(agenda().some((a) => a.nome === 'Pessoa Dia Quinze'), false);
-  assert.match(texto, /Sexta-feira 16 de outubro e Sábado 17 de outubro/);
-  assert.doesNotMatch(texto, /Quinta-feira 15/);
-  assert.doesNotMatch(bot.promptSistema(jids[0]), new RegExp(`- ${NP15}`));
+test('Novo Progresso dia 15 só às 08:00 e 14:00, alternando', () => {
+  for (let i = 0; i < 6; i++) bot.processarResposta(marcar(`Pessoa Quinze ${i} Lima`, `${NP15} às 09:00`), jids[i]);
+  const dia15 = agenda().filter((a) => a.horario.startsWith(NP15));
+  assert.deepEqual(dia15.map(hora), ['08:00', '14:00', '08:00', '14:00', '08:00', '14:00']);
 });
 
-test('familiar de quem já está no dia 15 não reabre o dia 15', () => {
-  fs.writeFileSync(arq, JSON.stringify([...agenda(), { nome: 'Titular Dia Quinze', telefone: jids[1].split('@')[0], horario: `${NP15} às 08:00` }]));
-  const texto = bot.processarResposta(marcar('Filho Do Titular', `${NP15} às 08:00`), jids[1]);
-  assert.equal(agenda().some((a) => a.nome === 'Filho Do Titular'), false);
-  assert.match(texto, /Sexta-feira 16 de outubro/);
+test('sem pedir o dia 16, a IA marcar dia 16 vai para o dia 15; dia 16 não é oferecido', () => {
+  bot.processarResposta(marcar('Pessoa Sem Pedido Lima', `${NP16} às 08:00`), jids[10]);
+  assert.ok(agenda().find((a) => a.nome === 'Pessoa Sem Pedido Lima').horario.startsWith(NP15));
+  const prompt = bot.promptSistema(jids[10]);
+  assert.match(prompt, /USAR SOMENTE SE A PESSOA PEDIR ESTE DIA/);
+  const texto = bot.processarResposta(marcar('Sem Aceite Np Teste', `${NP15} às 08:00`), novoJid());
+  assert.match(texto, /Quinta-feira 15 de outubro e Sábado 17 de outubro/);
+  assert.doesNotMatch(texto, /Sexta-feira 16/);
+});
+
+test('Novo Progresso dia 17 só às 08:00 e 14:00', () => {
+  historicos[jids[11]] = [...aceite('Novo Progresso-PA'), { role: 'cliente', text: 'prefiro sábado dia 17' }];
+  fs.writeFileSync(path.join(process.env.DATA_DIR, 'historicos.json'), JSON.stringify(historicos));
+  bot.processarResposta(marcar('Pessoa Dezessete Lima', `${NP17} às 10:00`), jids[11]);
+  assert.match(hora(agenda().find((a) => a.nome === 'Pessoa Dezessete Lima')), /^(08|14):00$/);
 });
 
 test('Novo Progresso dia 16 para quem pede segue a regra normal (manhã primeiro)', () => {
