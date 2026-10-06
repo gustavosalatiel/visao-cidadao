@@ -22,6 +22,7 @@ const jids = Array.from({ length: 80 }, novoJid);
 const historicos = {};
 jids.slice(0, 40).forEach((j) => { historicos[j] = aceite('Novo Progresso-PA'); });
 jids.slice(40, 70).forEach((j) => { historicos[j] = aceite('Uruará-PA'); });
+historicos[jids[12]] = [...aceite('Novo Progresso-PA'), { role: 'cliente', text: 'quero na quinta, dia 15' }];
 historicos[jids[20]] = [...aceite('Novo Progresso-PA'), { role: 'cliente', text: 'prefiro na sexta, dia 16' }];
 historicos[jids[70]] = [...aceite('Uruará-PA'), { role: 'cliente', text: 'quero dia 21' }];
 historicos[jids[71]] = [...aceite('Uruará-PA'), { role: 'cliente', text: 'não consigo dia 22, só posso na quarta' }];
@@ -33,15 +34,22 @@ const marcar = (nome, horario) => '###AGENDAR###' + JSON.stringify({ nome, horar
 const hora = (a) => a.horario.slice(-5);
 const periodo = (a) => (Number(hora(a).slice(0, 2)) < 12 ? 'manhã' : 'tarde');
 
-test('Novo Progresso dia 15 só às 08:00 e 14:00, alternando', () => {
-  for (let i = 0; i < 6; i++) bot.processarResposta(marcar(`Pessoa Quinze ${i} Lima`, `${NP15} às 09:00`), jids[i]);
-  const dia15 = agenda().filter((a) => a.horario.startsWith(NP15));
-  assert.deepEqual(dia15.map(hora), ['08:00', '14:00', '08:00', '14:00', '08:00', '14:00']);
+test('Novo Progresso sem dia escolhido vai para o dia 17, só às 08:00 e 14:00, alternando', () => {
+  for (let i = 0; i < 6; i++) bot.processarResposta(marcar(`Pessoa Padrao ${i} Lima`, `${NP15} às 09:00`), jids[i]);
+  const novos = agenda().filter((a) => a.nome.startsWith('Pessoa Padrao'));
+  assert.ok(novos.every((a) => a.horario.startsWith(NP17)), JSON.stringify(novos.map((a) => a.horario)));
+  assert.deepEqual(novos.map(hora), ['08:00', '14:00', '08:00', '14:00', '08:00', '14:00']);
 });
 
-test('sem pedir o dia 16, a IA marcar dia 16 vai para o dia 15; dia 16 não é oferecido', () => {
+test('quem pede o dia 15 fica no dia 15, só às 08:00 ou 14:00', () => {
+  bot.processarResposta(marcar('Pede Quinze Lima', `${NP15} às 10:00`), jids[12]);
+  const a = agenda().find((x) => x.nome === 'Pede Quinze Lima');
+  assert.ok(a.horario.startsWith(NP15) && /^(08|14):00$/.test(hora(a)), a.horario);
+});
+
+test('sem pedir o dia 16, a IA marcar dia 16 vai para o dia 17; dia 16 não é oferecido', () => {
   bot.processarResposta(marcar('Pessoa Sem Pedido Lima', `${NP16} às 08:00`), jids[10]);
-  assert.ok(agenda().find((a) => a.nome === 'Pessoa Sem Pedido Lima').horario.startsWith(NP15));
+  assert.ok(agenda().find((a) => a.nome === 'Pessoa Sem Pedido Lima').horario.startsWith(NP17));
   const prompt = bot.promptSistema(jids[10]);
   assert.match(prompt, /USAR SOMENTE SE A PESSOA PEDIR ESTE DIA/);
   const texto = bot.processarResposta(marcar('Sem Aceite Np Teste', `${NP15} às 08:00`), novoJid());
